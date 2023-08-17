@@ -53,7 +53,7 @@ WSYNC   = $D40A
 VCOUNT  = $D40B
 NMIEN   = $D40E
 
-RESETWM = $C290
+RESETCD	= $C2C8
 
 ;-----------------------------------------------------------------------		
 ; SimplyCART Bank
@@ -204,8 +204,6 @@ MLOOP	lda #$08
 		and #$04
 		cmp #$04
 		beq MLOOP
-
-
 		
 		lda KBCODE
 		ldx #27
@@ -241,11 +239,14 @@ RESTORE	lda #$00
 		pla
 		sta DLPTRS
 		pla
-		sta DMACTLS	
+		sta DMACTLS
+
 		;--------	
 		; Load XEX		
 		lda #$01
 		sta CRITIC
+		lda #$00
+		sta DMACTL
 		lda POS
 		jsr LOADPOS
 		
@@ -255,9 +256,9 @@ RESTORE	lda #$00
 		sei	
 		lda #$00
 		sta CRITIC	
-		lda #<RESETWM
+		lda #<RESETCD
 		sta BACK
-		lda #>RESETWM
+		lda #>RESETCD
 		sta BACK+1
 		lda RUNAD
 		sta RUN
@@ -299,7 +300,7 @@ LOADPOS	asl
 		jsr GET
 		cmp #$FF		; Chceck DOS Header
 		beq @+
-ERRORWM	jmp RESETWM 	; Warm Reset if ERROR
+ERRORWM	jmp RESETCD 	; Warm Reset if ERROR
 @		jsr IncSrc
 		jsr CmpSrc
 		bcs ERRORWM
@@ -349,7 +350,7 @@ TRANSF	jsr GET			; Read BYTE
 		bcs ERRORWM		; ERROR NoDATA
 		bcc	TRANSF		; Repeat transfer byte
 		
-ENDBLK	lda INITAD		; End DOS block
+ENDBLK 	lda INITAD		; End DOS block
 		cmp #$FF		; New INITAD?
 		bne RUNPART		; Run INIT Procedure
 		lda INITAD+1
@@ -377,15 +378,19 @@ RUNPART	lda BANK
 		lda #$00
 		sta CRITIC
 		jsr ENTRY
-		
+
+		lda #$01
+		sta CRITIC
+		lda #$00
+		sta DMACTL
+		lda TRIG3
+		sta GINTLK
+		cli				; Allow IRQ
+				
 		lda #$FF		; Clear INITAD for next detection
 		sta INITAD
 		sta INITAD+1
-	
-		lda #$01
-		sta CRITIC
-		lda TRIG3
-		sta GINTLK
+
 		jsr CopyCPY
 		pla
 		sta SRC+1		; Restore MSB
@@ -394,7 +399,6 @@ RUNPART	lda BANK
 		pla
 		sta BANK		; Restore BANK
 
-		cli				; Allow IRQ
 		jmp LOOP
 		
 ;-----------------------------------------------------------------------		
@@ -492,7 +496,7 @@ fonts	:+1024 dta $00
 		ORG $BF80
 		
 DTACPYS
-PUTBYTE	sta $D580
+PUTBYTE	sta $D5FF
 ADRDST	sta $FFFF
 		bcc BACKC
 
@@ -503,24 +507,24 @@ BACKC	sta $D500
 		rts
 DTACPYE
 ;---
-ENTRYS	sta $D580
+ENTRYS	sta $D5FF
 		lda TRIG3
 		sta GINTLK
 		cli
-ADRRUN	jsr RESETWM
+ADRRUN	jsr RESETCD
 		sei
 		sta $D500
 ADRBCK	jmp EXIT
 ENTRYE
-;-----------------------------------------------------------------------		
-; Cold RESET
-COLDRST	sta $D500
-		jmp RESETWM
+
 ;-----------------------------------------------------------------------		
 ; INITCART ROUTINE - back from old MaxFlash
 
-		ORG $BFF4
-	
+		ORG $BFED
+
+COLDRST	jsr INIT		; catch lost code on unused bank, set bank 0
+		jmp RESETCD		; and ColdReset
+		nop				; fill Bank Number
 INIT	lda #$00
 		sta $D500
 EXIT	rts

@@ -143,6 +143,14 @@ unsigned int loadFile(const char *path, U8 *buf, unsigned int sizebuf)
 	return size;
 }
 /*--------------------------------------------------------------------*/
+/*void saveRAW(U8 *raw, unsigned int size)
+{
+	FILE *pf;
+	pf=fopen("RAW.XEX","wb");
+	fwrite(raw,1,size,pf);
+	fclose(pf);
+};*/
+/*--------------------------------------------------------------------*/
 unsigned int repairFile(U8 *buf, unsigned int size)
 {
 	unsigned int i=0,j,first=0xFFFF,run=0,init=0,ret=size;
@@ -198,6 +206,7 @@ static unsigned int pos=0;
 	{
 		unsigned int size=loadFile(path,buf,sizeof(buf)-8192-6);
 		size=repairFile(buf,size);
+		//saveRAW(buf,size);
 		if (size)
 		{
 			unsigned int over=insertPos(name,data,carsize,pos,buf,size);
@@ -310,9 +319,13 @@ U8 saveCAR(const char *filename, U8 *data, unsigned int carsize)
 void addMenu(U8 *cardata, unsigned int size, 
              U8 *loader, unsigned int loadersize, unsigned int offset)
 {
-	unsigned int i;
+	unsigned int i,j;
+	for (j=0; j<(size/BANKSIZE); j++)
+	{
+		for (i=0; i<offset; i++) {cardata[(j+1)*BANKSIZE-offset+i]=loader[loadersize-offset+i];};
+		cardata[(j+1)*BANKSIZE-offset+6]=j;
+	};
 	for (i=0; i<loadersize; i++) {cardata[i]=loader[i];};
-	for (i=0; i<offset; i++) {cardata[size-offset+i]=loader[loadersize-offset+i];};
 }
 /*--------------------------------------------------------------------*/
 void fillData(U8 *cardata, unsigned int size, U8 byte)
@@ -324,8 +337,8 @@ void fillData(U8 *cardata, unsigned int size, U8 byte)
 void menu4car(const char *filemenu, const char *carname)
 {
 	U8 cardata[CARMAX];
-	fillData(cardata, CARMAX, 0xFF);
-	addMenu(cardata,CARMAX,menu4car_bin,menu4car_bin_len,12);
+	fillData(cardata, CARMAX, 0xEA);
+	addMenu(cardata,CARMAX,menu4car_bin,menu4car_bin_len,19);
 	addData(cardata,512*1024,filemenu);
 	saveCAR(carname,cardata,CARMAX);
 }
