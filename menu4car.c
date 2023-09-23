@@ -328,17 +328,43 @@ void addMenu(U8 *cardata, unsigned int size,
 	for (i=0; i<loadersize; i++) {cardata[i]=loader[i];};
 }
 /*--------------------------------------------------------------------*/
+void addLogo(U8 *cardata, const char *logofile, unsigned int size, unsigned int nop)
+{
+	FILE *pf;
+	unsigned int i,j;
+	if (logofile)
+	{
+		pf=fopen(logofile,"rb");
+		if (pf)
+		{
+			for (i=0; i<(size/nop); i++)
+			{
+				U8 b=0,pix[1];
+				for (j=0; j<nop; j++)
+				{
+					fread(pix,sizeof(U8),1,pf);
+					b<<=(8/nop);
+					b+=pix[0];
+				};
+				cardata[32*4+i]=b;
+			};
+			fclose(pf);
+		};
+	};
+}
+/*--------------------------------------------------------------------*/
 void fillData(U8 *cardata, unsigned int size, U8 byte)
 {
 	unsigned int i;
 	for (i=0; i<size; i++) {cardata[i]=byte;};
 }
 /*--------------------------------------------------------------------*/
-void menu4car(const char *filemenu, const char *carname)
+void menu4car(const char *filemenu, const char *logo, const char *carname)
 {
 	U8 cardata[CARMAX];
 	fillData(cardata, CARMAX, 0xEA);
 	addMenu(cardata,CARMAX,menu4car_bin,menu4car_bin_len,19);
+	addLogo(cardata,logo,256*16,8);
 	addData(cardata,512*1024,filemenu);
 	saveCAR(carname,cardata,CARMAX);
 }
@@ -348,7 +374,11 @@ int main( int argc, char* argv[] )
 	printf("Menu4CAR - ver: %s\n",__DATE__);
 	if (argc==3)
 	{
-		menu4car(argv[1],argv[2]);
+		menu4car(argv[1],NULL,argv[2]);
+	} else
+	if (argc==4)
+	{
+		menu4car(argv[1],argv[2],argv[3]);
 	}
 	else
 	{
