@@ -154,7 +154,8 @@ pm		:+1024 dta $A5
 ;-----------------------------------------------------------------------		
 ; CART MAIN CODE
 	
-BEGIN	ldx #$15 ; $01EB - $01FF on STACK for LOADER
+BEGIN	jsr TESTSEL
+		ldx #$15 ; $01EB - $01FF on STACK for LOADER
 		lda #$EA
 @		pha
 		dex
@@ -163,6 +164,8 @@ BEGIN	ldx #$15 ; $01EB - $01FF on STACK for LOADER
 		;--------	
 		; Set Menu
 		lda TMP
+		pha
+		lda TMP+1
 		pha
 		lda DMACTLS
 		pha
@@ -226,6 +229,9 @@ BEGIN	ldx #$15 ; $01EB - $01FF on STACK for LOADER
 		sta $0100,X
 		dex
 		bpl @-
+		;--------
+		; Clear RAM under cart
+		jsr CopyCLR
 		;--------
 		; Chose XEX
 		lda #$00
@@ -313,6 +319,8 @@ RESTORE	lda #$00
 		sta DLPTRS
 		pla
 		sta DMACTLS
+		pla
+		sta TMP+1
 		pla
 		sta TMP
 
@@ -540,6 +548,21 @@ CmpDst	lda DST
 		rts
 
 ;-----------------------------------------------------------------------		
+; Copy Clear to $0400
+CopyCLR	ldx #(CLPRE-CLPRS-1)
+@		lda CLPRS,X
+		sta $0400,X
+		dex
+		bpl @-
+		jsr $0400	
+		ldx #(CLPRE-CLPRS-1)
+@		lda #$00
+		sta $0400,X
+		dex
+		bpl @-		
+		rts
+
+;-----------------------------------------------------------------------		
 ; Copy Copy to Stack
 CopyCPY	ldx #(DTACPYE-DTACPYS)
 @		lda DTACPYS-1,X
@@ -557,6 +580,20 @@ CopyENT	ldx #(ENTRYE-ENTRYS)
 		bne @-
 		rts
 ;-----------------------------------------------------------------------		
+; Test /Select/ and Disable Cartridge
+TESTSEL	lda CONSOL
+		and #$02
+		bne CONTIN
+		ldx #(CONTIN-DISCART-1)
+@		lda DISCART,X
+		sta $0400,x
+		dex
+		bpl @-
+		jmp $0400
+DISCART sta $D5FF
+		jmp RESETCD
+CONTIN	rts		
+;-----------------------------------------------------------------------		
 ; Keyboard Table
 		;         A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
 KEYTBLE	dta $FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,$2F,$28,$3E,$2D,$0B,$10,$2E,$16,$2B,$17	
@@ -567,9 +604,35 @@ KEYTBLE	dta $FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,
 fonts	:+1024 dta $00		
 
 ;-----------------------------------------------------------------------		
-; STACK CODE
 		ORG $BF80
-		
+;-----------------------------------------------------------------------		
+; $0400 CODE
+; CLR $A000 - $BFFF
+CLPRS	lda #$01
+		sta CRITIC
+		sta $D5FF
+		lda #$A0
+		sta TMP+1
+		lda #$00
+		sta TMP
+		ldy #$00
+NEWPAG	lda #$00
+@		sta (TMP),Y
+		iny
+		bne @-
+		inc TMP+1
+		lda TMP+1
+		cmp #$C0
+		bne NEWPAG
+		sta $D500
+		lda TRIG3
+		sta GINTLK 
+		lda #$00
+		sta CRITIC
+		rts
+CLPRE		
+;-----------------------------------------------------------------------		
+; STACK CODE	
 DTACPYS
 PUTBYTE	sta $D5FF
 ADRDST	sta $FFFF
