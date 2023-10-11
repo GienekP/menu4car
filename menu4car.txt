@@ -1,3 +1,3 @@
 Tester|tester.xex
-AąĆćĘęŁłŃńÓóŚśŻżŹź|Tester.xex
-ÄäËëÖöÜüß£{}~±↑↓←→|Tester.xex
+AąĆćĘęŁłŃńÓóŚśŻżŹź|tester.xex
+ÄäËëÖöÜüß£{}~±↑↓←→|tester.xex
