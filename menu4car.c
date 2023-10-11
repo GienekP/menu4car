@@ -37,7 +37,17 @@ void fillATASCII(U8 *txt, const U8 *name, unsigned int limit)
 			c=0x20;
 			i=24;
 		} else
-		if ((c==0xC3) || (c==0xC4) || (c==0xC5)) // UTF-8
+		if ((c>=' ') && (c<0x80))
+		{
+			switch (c)
+			{
+				case '|': {c=0x7C;} break;
+				case '~': {c=0x7D;} break;
+				case '{': {c=0x7E;} break;
+				case '}': {c=0x7F;} break;
+			}
+		} else
+		if ((c==0xC2) || (c==0xC3) || (c==0xC4) || (c==0xC5)) // UTF-8
 		{
 			unsigned int utf8=c;
 			utf8<<=8;
@@ -45,27 +55,57 @@ void fillATASCII(U8 *txt, const U8 *name, unsigned int limit)
 			j++;
 			switch (utf8)
 			{
-				case 0xC484: {c='A';} break; // Ą
-				case 0xC486: {c='C';} break; // Ć
-				case 0xC498: {c='E';} break; // Ę
-				case 0xC581: {c='L';} break; // Ł
-				case 0xC583: {c='N';} break; // Ń
-				case 0xC393: {c='O';} break; // Ó
-				case 0xC59A: {c='S';} break; // Ś
-				case 0xC5B9: {c='Z';} break; // Ź
-				case 0xC5BB: {c='Z';} break; // Ż
-				case 0xC485: {c='a';} break; // ą
-				case 0xC487: {c='c';} break; // ć
-				case 0xC499: {c='e';} break; // ę
-				case 0xC582: {c='l';} break; // ł
-				case 0xC584: {c='n';} break; // ń
-				case 0xC3B3: {c='o';} break; // ó
-				case 0xC59B: {c='s';} break; // ś
-				case 0xC5BA: {c='z';} break; // ź
-				case 0xC5BC: {c='z';} break; // ż
+				case 0xC484: {c=0x17;} break; // Ą
+				case 0xC486: {c=0x16;} break; // Ć
+				case 0xC498: {c=0x12;} break; // Ę
+				case 0xC581: {c=0x0B;} break; // Ł
+				case 0xC583: {c=0x0D;} break; // Ń
+				case 0xC393: {c=0x10;} break; // Ó
+				case 0xC59A: {c=0x04;} break; // Ś
+				case 0xC5B9: {c=0x18;} break; // Ź
+				case 0xC5BB: {c=0x00;} break; // Ż
+				case 0xC485: {c=0x01;} break; // ą
+				case 0xC487: {c=0x03;} break; // ć
+				case 0xC499: {c=0x05;} break; // ę
+				case 0xC582: {c=0x0C;} break; // ł
+				case 0xC584: {c=0x0E;} break; // ń
+				case 0xC3B3: {c=0x0F;} break; // ó
+				case 0xC59B: {c=0x13;} break; // ś
+				case 0xC5BA: {c=0x02;} break; // ź
+				case 0xC5BC: {c=0x1A;} break; // ż
+				case 0xC384: {c=0x19;} break; // Ä
+				case 0xC38B: {c='E';}  break; // Ë
+				case 0xC396: {c=0x07;} break; // Ö
+				case 0xC39C: {c=0x15;} break; // Ü
+				case 0xC3A4: {c=0x14;} break; // ä
+				case 0xC3AB: {c='e';}  break; // ë
+				case 0xC3B6: {c=0x06;} break; // ö
+				case 0xC3BC: {c=0x09;} break; // ü
+				case 0xC39F: {c=0x0A;} break; // ß
+				case 0xC2A3: {c=0x08;} break; // £
+				case 0xC2B1: {c=0x1B;} break; // ±
 				default: {c=0x20;} break;
 			};	
-		};
+		} else
+		if (c==0xE2)
+		{
+			unsigned int utf8=c;
+			utf8<<=8;
+			utf8|=name[j];
+			j++;
+			utf8<<=8;
+			utf8|=name[j];
+			j++;
+			switch (utf8)
+			{
+				case 0xE28690: {c=0x1E;} break; // ←
+				case 0xE28691: {c=0x1C;} break; // ↑
+				case 0xE28692: {c=0x1F;} break; // →				
+				case 0xE28693: {c=0x1D;} break; // ↓
+				default: {c=0x20;} break;
+			};			
+		}
+		else {c=0x20;};
 		txt[i]=ATASCII2Internal(c);
 	};
 }

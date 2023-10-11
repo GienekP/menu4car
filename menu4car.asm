@@ -44,6 +44,7 @@ COLBAKS	= $02C8
 INITAD  = $02E2
 RUNAD   = $02E0
 MEMTOP  = $02E5
+CHBAS   = $02F4
 BASICF  = $03F8
 GINTLK  = $03FA
 
@@ -60,6 +61,7 @@ RANDOM  = $D20A
 SKSTAT  = $D20F
 PORTB   = $D301
 DMACTL  = $D400
+CHBASE  = $D409
 WSYNC   = $D40A
 VCOUNT  = $D40B
 NMIEN   = $D40E
@@ -148,9 +150,15 @@ antic	:+1 dta $70
 		dta $41,<antic,>antic
 
 ;-----------------------------------------------------------------------		
+; FONTS
+		ORG $A800
+		
+fonts	INS 'fonts.fnt'
+;-----------------------------------------------------------------------		
 ; P/M DATA
-pm		:+1024 dta $A5
-	
+		ORG $AC00
+		
+pm		:+1024 dta $00
 ;-----------------------------------------------------------------------		
 ; CART MAIN CODE
 	
@@ -198,6 +206,12 @@ BEGIN	jsr TESTSEL
 		pha
 		lda #$02
 		sta COLPF2S
+		
+		lda CHBAS
+		pha
+		lda #>fonts
+		sta CHBAS
+		sta CHBASE
 		
 		;--------	
 		; Disable BASIC
@@ -305,6 +319,8 @@ FINDKEY	dex
 		; Restore Screen	
 RESTORE	lda #$00
 		sta DMACTL
+		pla
+		sta CHBAS
 		pla
 		sta COLPF2S
 		pla
@@ -598,11 +614,9 @@ CONTIN	rts
 		;         A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
 KEYTBLE	dta $FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,$2F,$28,$3E,$2D,$0B,$10,$2E,$16,$2B,$17	
 ;-----------------------------------------------------------------------		
-; FONTS
-		ORG $BB00
+		ORG $B500
 		
-fonts	:+1024 dta $00		
-
+DCART	:+256 dta $EA
 ;-----------------------------------------------------------------------		
 		ORG $BF80
 ;-----------------------------------------------------------------------		
