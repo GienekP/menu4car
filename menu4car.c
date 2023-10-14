@@ -145,7 +145,7 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 		unsigned int al=data[4*pos+3];
 		bh&=0x7F;
 		data[4*pos]=bh;
-		start=((((bh<<7)+bl)*BANKSIZE)|(((ah<<8)|al)&0x1FFF)+0);
+		start=((((bh<<7)+bl)*BANKSIZE)|(((ah<<8)|al)&0x1FFF));
 	};
 	stop=(start+size);
 	if (stop>carsize) 
