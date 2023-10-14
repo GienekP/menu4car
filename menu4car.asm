@@ -18,7 +18,7 @@ ENTRY   = ($0200-(ENTRYE-ENTRYS))
 
 ;-----------------------------------------------------------------------
 
-TMP		= $00
+TMP     = $00
 CASINI  = $02 
 WARMST  = $08
 BOOTQ   = $09
@@ -49,6 +49,7 @@ BASICF  = $03F8
 GINTLK  = $03FA
 
 TRIG0   = $D010
+TRIG1   = $D011
 TRIG3   = $D013
 COLPF0  = $D016
 COLPF1  = $D017
@@ -59,6 +60,7 @@ CONSOL  = $D01F
 KBCODE  = $D209
 RANDOM  = $D20A
 SKSTAT  = $D20F
+PORTA   = $D300
 PORTB   = $D301
 DMACTL  = $D400
 CHBASE  = $D409
@@ -67,6 +69,7 @@ VCOUNT  = $D40B
 NMIEN   = $D40E
 
 RESETCD	= $C2C8
+
 
 ;-----------------------------------------------------------------------		
 ; SimplyCART Bank
@@ -265,33 +268,26 @@ BEGIN	jsr TESTSEL
 		dex
 		sta POS
 		beq RESTORE
+		lda #$00
+		sta TMP
+		sta TMP+1
 		;--------	
 		; Menu LOOP
-MLOOP	lda #$07
-@		cmp VCOUNT
-		bne @-
-		lda #$0E
-		sta COLPF1		
-		
-		clc
-		ldx #$00
-		lda #$06
-@		sta COLPF2
-		add #$10
-		inx
-		sta WSYNC
-		cpx #$0F
-		bne @-
-	
-		lda #$10
-@		cmp VCOUNT
-		bne @-
-		lda #$04
-		sta COLPF2		
-		lda #$0C
-		sta COLPF1		
-				
-		lda #$FF
+MLOOP	jsr PAINT
+		jsr JOYS
+		lda TMP
+		tax
+		and #$80
+		beq @+
+		txa
+		and #$7F
+		beq RANDOPT
+		tax
+		bne FINDKEY
+			
+		;--------	
+		; Read Key	
+@		lda #$FF
 		sta KBCODE
 		lda SKSTAT
 		and #$04
@@ -364,7 +360,119 @@ RESTORE	lda #$00
 		lda RUNAD+1
 		sta RUN+1
 		jmp ENTRY
+;-----------------------------------------------------------------------		
+; Paint colors
+PAINT	lda TMP
+		beq @+
+		asl
+		asl
+		adc #$0C
+@		tay
+		
+		lda #$07
+@		cmp VCOUNT
+		bne @-
+		lda #$0E
+		sta COLPF1		
+		
+		clc
+		ldx #$00
+		lda #$06
+@		sta COLPF2
+		add #$10
+		inx
+		sta WSYNC
+		cpx #$0F
+		bne @-
+		
+		sta WSYNC
+		sta WSYNC
+		tya
+		cmp #$10
+		beq @+
+		
+		sta WSYNC
 
+		beq STDCLR
+		jsr STDCLR
+
+@		cmp VCOUNT
+		bne @-			
+		lda #$08
+		sta COLPF2
+		lda #$0E
+		sta COLPF1
+		ldx #$08
+		lda #$04
+@		sta WSYNC
+		dex
+		bne @-
+		;--------	
+		; Standard Colors
+STDCLR 	ldx #$04
+		stx COLPF2		
+		ldx #$0C
+		stx COLPF1
+NOBAR	rts	
+
+;-----------------------------------------------------------------------		
+; /Start/Select/Option/ & JOY 1+2
+JOYS	lda CONSOL
+		cmp #$05
+		beq NEXT
+		cmp #$03
+		beq PREV
+		cmp #$06
+		beq CLICK
+		
+		lda PORTA
+		cmp #$FD
+		beq NEXT
+		cmp #$DF
+		beq NEXT
+		cmp #$FE
+		beq PREV
+		cmp #$EF
+		beq PREV
+		lda TRIG0
+		beq CLICK
+		lda TRIG1
+		beq CLICK
+			
+		lda #$00
+		sta TMP+1
+		rts	
+		;--------	
+		; Next
+NEXT	lda TMP+1
+		bne @+
+		inc TMP+1
+		inc TMP
+		ldx TMP
+		dex 
+		cpx CNT
+		bne @+
+		lda #$01
+		sta TMP
+@		rts
+		;--------	
+		; Previous
+PREV	lda TMP+1
+		bne @+
+		inc TMP+1
+		lda TMP
+		beq PRLAST
+		dec TMP
+		bne @+
+PRLAST	ldx CNT
+		stx TMP
+@		rts		
+		;--------	
+		; Click
+CLICK	lda TMP
+		ora #$80
+		sta TMP
+@		rts
 ;-----------------------------------------------------------------------		
 ; Load POS=A
 
