@@ -71,7 +71,7 @@ NMIEN   = $D40E
 RESETCD	= $C2C8
 
 ;-----------------------------------------------------------------------		
-; SimplyCART Bank
+; Standard Bank
 
 		OPT h-f+
 		
