@@ -10,6 +10,7 @@ typedef unsigned char U8;
 /*--------------------------------------------------------------------*/
 #define STARTINBANK (0x0000)
 #define CARMAX (1024*1024)
+#define FLASHMAX (512*1024)
 #define BANKSIZE (8192)
 #define PATHLEN (1024)
 /*--------------------------------------------------------------------*/
@@ -241,7 +242,7 @@ unsigned int repairFile(U8 *buf, unsigned int size)
 unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char *path, U8 status)
 {
 static unsigned int pos=0;
-	U8 buf[512*1024];
+	U8 buf[FLASHMAX];
 	if (status)
 	{
 		unsigned int size=loadFile(path,buf,sizeof(buf)-8192-6);
@@ -405,7 +406,7 @@ void menu4car(const char *filemenu, const char *logo, const char *carname)
 	fillData(cardata, CARMAX, 0xEA);
 	addMenu(cardata,CARMAX,menu4car_bin,menu4car_bin_len,19);
 	addLogo(cardata,logo,256*16,8);
-	addData(cardata,512*1024,filemenu);
+	addData(cardata,FLASHMAX,filemenu);
 	saveCAR(carname,cardata,CARMAX);
 }
 /*--------------------------------------------------------------------*/
