@@ -12,6 +12,8 @@ typedef unsigned char U8;
 #define FLASHMAX (512*1024)
 #define BANKSIZE (0x2000)
 #define PATHLEN (0x400)
+#define NAMELEN (0x30)
+#define DELIM	('|')
 /*--------------------------------------------------------------------*/
 #include "menu4car.h"
 /*--------------------------------------------------------------------*/
@@ -44,6 +46,8 @@ DictEntry UTF8Trans[] = {
 {"ö",0x06}, {"ü",0x09}, {"ß",0x0A}, {"£",0x08}, {"±",0x1B}, {"←",0x1E}, {"↑",0x1C}, {"→",0x1F},
 {"↓",0x1D}, {NULL,0}
 };
+
+#define GETW(b,i) (b[(i)]|(b[(i)+1])<<8)
 unsigned int getUTF8(U8 **name)
 {
 			unsigned int utf8=(unsigned int)(U8)(**name);
@@ -140,6 +144,8 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 		data[4*pos+7]=(stop&0xFF);
 		fillATASCII(&data[32*4+16*32+32*pos+6],(U8 *)name,24);
 	};
+
+	//printf("OFFSET: $%06x: file \"%s\", length $%04x bytes.\n",start,name,size);
 	return ret;
 }
 /*--------------------------------------------------------------------*/
@@ -171,21 +177,19 @@ unsigned int loadFile(const char *path, U8 *buf, unsigned int sizebuf)
 unsigned int repairFile(U8 *buf, unsigned int size)
 {
 	unsigned int i=0,j,first=0xFFFF,run=0,init=0,ret=size;
-	if ((buf[0]==0xFF) && (buf[1]==0xFF))
+	if (GETW(buf,0)==0xFFFF)
 	{
 		unsigned int a,b,start,stop;
 		i+=2;
 		while (i<ret)
 		{
-			if ((buf[i]==0xFF) && (buf[i+1]==0xFF))
+			if (GETW(buf,i)==0xFFFF)
 			{
 				for (j=i; j<ret; j++) {buf[j]=buf[j+2];};
 				ret-=2;
 			};
-			a=buf[i]; b=buf[i+1];
-			start=((b<<8)|a);
-			a=buf[i+2]; b=buf[i+3];
-			stop=((b<<8)|a);
+			start = GETW(buf,i);
+			stop  = GETW(buf,i+2);
 			if (start>stop) {ret=i;}
 			else
 			{
@@ -241,11 +245,11 @@ U8 readLine(FILE *pf,char *name, char *path)
 	U8 status=0,rb;
 	char b[1];
 	unsigned int i;
-	for (i=0; i<48; i++) {name[i]=0;};
-	for (i=0; i<48; i++)
+	for (i=0; i<NAMELEN; i++) {name[i]=0;};
+	for (i=0; i<NAMELEN; i++)
 	{
 		b[0]=0;
-		if (feof(pf)) {i=48;}
+		if (feof(pf)) {i=NAMELEN;}
 		else
 		{
 			fread(b,sizeof(U8),sizeof(b),pf);
@@ -253,10 +257,10 @@ U8 readLine(FILE *pf,char *name, char *path)
 			if (rb==0x0D)
 			{
 				fread(b,sizeof(U8),sizeof(b),pf);
-				i=48;
+				i=NAMELEN;
 			} else
-			if (rb==0x0A) {i=48;} else
-			if (rb=='|') {i=48; status=1;} else{name[i]=rb;};	
+			if (rb==0x0A) {i=NAMELEN;} else
+			if (rb==DELIM) {i=NAMELEN; status=1;} else{name[i]=rb;};
 		};
 	};
 	if (status==1)
@@ -284,7 +288,7 @@ U8 readLine(FILE *pf,char *name, char *path)
 /*--------------------------------------------------------------------*/
 void addData(U8 *data, unsigned int carsize, const char *filemenu)
 {
-	char name[48],path[PATHLEN];
+	char name[NAMELEN],path[PATHLEN];
 	FILE *pf;
 	unsigned int i;
 	pf=fopen(filemenu,"rb");
@@ -293,6 +297,7 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 		for (i=0; i<26; i++)
 		{
 			U8 status=readLine(pf,name,path);
+			if (name[0]=='#') continue;
 			addPos(data,carsize,name,path,status);
 		};
 		for (i=0; i<27; i++)
