@@ -2,7 +2,7 @@
 
 This utility let's you create a MaxFlash/JCart cart image with your favourite Atari 8-bit games.
 
-Games are to in standard Atari Dos binary.
+Games are to be in standard Atari Dos binary.
 
 The example file menu4car.txt contains an input in form of sort of csv file, separated by "|" sign. It is an UTF-8 encoded file with Polish diacritical letters handling as well as some german letters too.
 
