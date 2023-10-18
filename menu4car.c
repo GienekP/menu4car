@@ -142,6 +142,9 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 		data[4*pos+5]=((stop/BANKSIZE)&0x7F);
 		data[4*pos+6]=((stop>>8)&0x1F);
 		data[4*pos+7]=(stop&0xFF);
+
+		data[32*4+16*32+32*pos+3]='A'+pos-0x20;
+		data[32*4+16*32+32*pos+4]='.'-0x20;
 		fillATASCII(&data[32*4+16*32+32*pos+6],(U8 *)name,24);
 	};
 
