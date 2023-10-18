@@ -2,6 +2,6 @@ Tester|tester.xex
 ĄąĆćĘęŁłŃńÓóŚśŻżŹź|tester.xex
 ÄäËëÖöÜüß£{}~±↑↓←→|tester.xex
 !@#$%^&*(){}:"|tester.xex
-abcdefghijklmnopqrstuvwxyz||tester.xex
+abcdefghijklmnopqrstuvwxyz|tester.xex
 abcd|tester.xex
 |tester.xex
