@@ -389,7 +389,7 @@ void fillData(U8 *cardata, unsigned int size, U8 byte)
 void menu4car(const char *filemenu, const char *logo, const char *carname)
 {
 	U8 cardata[CARMAX];
-	fillData(cardata, CARMAX, 0xEA);
+	fillData(cardata, CARMAX, 0xFF);
 	addMenu(cardata,CARMAX,menu4car_bin,menu4car_bin_len,19);
 	addLogo(cardata,logo,256*16,8);
 	addData(cardata,FLASHMAX,filemenu);
