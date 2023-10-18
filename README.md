@@ -1,6 +1,6 @@
 # MENU2CAR
 
-This utility let's you create a cart image with your favourite Atari 8-bit games.
+This utility let's you create a MaxFlash/JCart cart image with your favourite Atari 8-bit games.
 
 Games are to in standard Atari Dos binary.
 
