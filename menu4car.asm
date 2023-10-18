@@ -781,8 +781,8 @@ DISCART sta $D5FF
 CONTIN	rts		
 ;-----------------------------------------------------------------------		
 ; Keyboard Table
-		;         A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
-KEYTBLE	dta $FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,$2F,$28,$3E,$2D,$0B,$10,$2E,$16,$2B,$17	
+;		A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
+KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,$2F,$28,$3E,$2D,$0B,$10,$2E,$16,$2B,$17
 ;-----------------------------------------------------------------------		
 		ORG $B500
 		
@@ -792,26 +792,23 @@ DCART	:+256 dta $EA
 ;-----------------------------------------------------------------------		
 ; $0400 CODE
 ; CLR $A000 - $BFFF
-CLPRS	lda #$01
+CLPRS	lda #$A0
 		sta CRITIC
 		sta $D5FF
-		lda #$A0
 		sta TMP+1
 		lda #$00
 		sta TMP
-		ldy #$00
+		tay
 NEWPAG	lda #$00
 @		sta (TMP),Y
 		iny
 		bne @-
 		inc TMP+1
-		lda TMP+1
-		cmp #$C0
-		bne NEWPAG
+		bit TMP+1
+		bvc NEWPAG
 		sta $D500
-		lda TRIG3
-		sta GINTLK 
-		lda #$00
+		ldy TRIG3
+		sty GINTLK
 		sta CRITIC
 		rts
 CLPRE		
