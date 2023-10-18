@@ -231,7 +231,7 @@ static unsigned int pos=0;
 		if (size)
 		{
 			unsigned int over=insertPos(name,data,carsize,pos,buf,size);
-			if (over) {printf("Error with \"%s\", need %i bytes.\n",name,over);};
+			if (over) {printf("Error: \"%s\", does not fit, need %i bytes.\n",name,over);};
 		}
 		else {clearPos(data,pos);};
 	}
