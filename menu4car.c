@@ -226,6 +226,7 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 {
 static unsigned int pos=0;
 	U8 buf[FLASHMAX];
+	int advance=0;
 	if (status)
 	{
 		unsigned int size=loadFile(path,buf,sizeof(buf)-8192-6);
@@ -234,12 +235,13 @@ static unsigned int pos=0;
 		if (size)
 		{
 			unsigned int over=insertPos(name,data,carsize,pos,buf,size);
-			if (over) {printf("Error: \"%s\", does not fit, need %i bytes.\n",name,over);};
+			advance=1;
+			if (over) {printf("Error: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;};
 		}
 		else {clearPos(data,pos);};
 	}
 	else {clearPos(data,pos);};
-	pos++;
+	pos+=advance;
 	return pos;
 }
 /*--------------------------------------------------------------------*/
