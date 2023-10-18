@@ -10,103 +10,80 @@ typedef unsigned char U8;
 /*--------------------------------------------------------------------*/
 #define CARMAX (1024*1024)
 #define FLASHMAX (512*1024)
-#define BANKSIZE (8192)
-#define PATHLEN (1024)
+#define BANKSIZE (0x2000)
+#define PATHLEN (0x400)
 /*--------------------------------------------------------------------*/
 #include "menu4car.h"
 /*--------------------------------------------------------------------*/
 U8 ATASCII2Internal(U8 a)
 {
-	U8 i=0;
-	if (((a>=0x00) && (a<=0x1F)) || ((a>=0x80) && (a<=0x9F))) {i=(a+0x40);} else
-	if (((a>=0x20) && (a<=0x5F)) || ((a>=0xa0) && (a<=0xDF))) {i=(a-0x20);} else
-	{i=a;};
-	return i;
+	if (((a&0x7F)>=0x00) && ((a&0x7F)<=0x1F)) return a+0x40;
+	if (((a&0x7F)>=0x20) && ((a&0x7F)<=0x5F)) return a-0x20;
+	return a;
 }
-
+typedef struct {char * key; unsigned char val;} DictEntry;
+// WARNING! This file must be in UTF-8 format
+// and amd letters with ogonek's and acute's must be visible
+DictEntry UTF8Trans[] = {
+{"",0x20},
+{" ",0x20}, {"!",0x21}, {"\"",0x22},{"#",0x23}, {"$",0x24}, {"%",0x25}, {"&",0x26}, {"'",0x27},
+{"(",0x28}, {")",0x29}, {"*",0x2a}, {"+",0x2b}, {",",0x2c}, {"-",0x2d}, {".",0x2e}, {"/",0x2f},
+{"0",0x30}, {"1",0x31}, {"2",0x32}, {"3",0x33}, {"4",0x34}, {"5",0x35}, {"6",0x36}, {"7",0x37},
+{"8",0x38}, {"9",0x39}, {":",0x3a}, {";",0x3b}, {"<",0x3c}, {"=",0x3d}, {">",0x3e}, {"?",0x3f},
+{"@",0x40}, {"A",0x41}, {"B",0x42}, {"C",0x43}, {"D",0x44}, {"E",0x45}, {"F",0x46}, {"G",0x47},
+{"H",0x48}, {"I",0x49}, {"J",0x4a}, {"K",0x4b}, {"L",0x4c}, {"M",0x4d}, {"N",0x4e}, {"O",0x4f},
+{"P",0x50}, {"Q",0x51}, {"R",0x52}, {"S",0x53}, {"T",0x54}, {"U",0x55}, {"V",0x56}, {"W",0x57},
+{"X",0x58}, {"Y",0x59}, {"Z",0x5a}, {"[",0x5b}, {"\\",0x5c}, {"]",0x5d}, {"^",0x5e}, {"_",0x5f},
+{"`",0x60}, {"a",0x61}, {"b",0x62}, {"c",0x63}, {"d",0x64}, {"e",0x65}, {"f",0x66}, {"g",0x67},
+{"h",0x68}, {"i",0x69}, {"j",0x6a}, {"k",0x6b}, {"l",0x6c}, {"m",0x6d}, {"n",0x6e}, {"o",0x6f},
+{"p",0x70}, {"q",0x71}, {"r",0x72}, {"s",0x73}, {"t",0x74}, {"u",0x75}, {"v",0x76}, {"w",0x77},
+{"x",0x78}, {"y",0x79}, {"z",0x7a}, {"|",0x7c}, {"~",0x7d}, {"{",0x7e}, {"}",0x7f},
+{"Ą",0x17}, {"Ć",0x16}, {"Ę",0x12}, {"Ł",0x0B}, {"Ń",0x0D}, {"Ó",0x10}, {"Ś",0x04}, {"Ź",0x18},
+{"Ż",0x00}, {"ą",0x01}, {"ć",0x03}, {"ę",0x05}, {"ł",0x0C}, {"ń",0x0E}, {"ó",0x0F}, {"ś",0x13},
+{"ź",0x02}, {"ż",0x1A}, {"Ä",0x19}, {"Ë",'E'}, {"Ö",0x07}, {"Ü",0x15}, {"ä",0x14}, {"ë",'e'},
+{"ö",0x06}, {"ü",0x09}, {"ß",0x0A}, {"£",0x08}, {"±",0x1B}, {"←",0x1E}, {"↑",0x1C}, {"→",0x1F},
+{"↓",0x1D}, {NULL,0}
+};
+unsigned int getUTF8(U8 **name)
+{
+			unsigned int utf8=(unsigned int)(U8)(**name);
+			(*name)++;
+			if (utf8&0x80)
+				while (((**name)&0xc0)==0x80) {
+					utf8<<=8;
+					utf8|=(**name);
+					(*name)++;
+				}
+			return utf8;
+}
+unsigned int np_getUTF8(U8 *name) {
+	return getUTF8(& name);
+}
+#define UTF8(S) np_getUTF8((U8*)S)
 /*--------------------------------------------------------------------*/
 void fillATASCII(U8 *txt, const U8 *name, unsigned int limit)
 {
 	unsigned int i,j=0;
+	U8 * nameptr=(U8 *)name;
+	int endstring=0;
 	for (i=0; i<limit; i++)
 	{
-		U8 c=name[j];
-		j++;
+		unsigned int c=getUTF8(&nameptr);
 		if (c==0)
 		{
-			c=0x20;
-			i=24;
-		} else
-		if ((c>=' ') && (c<0x80))
-		{
-			switch (c)
-			{
-				case '|': {c=0x7C;} break;
-				case '~': {c=0x7D;} break;
-				case '{': {c=0x7E;} break;
-				case '}': {c=0x7F;} break;
-			}
-		} else
-		if ((c==0xC2) || (c==0xC3) || (c==0xC4) || (c==0xC5)) // UTF-8
-		{
-			unsigned int utf8=c;
-			utf8<<=8;
-			utf8|=name[j];
-			j++;
-			switch (utf8)
-			{
-				case 0xC484: {c=0x17;} break; // Ą
-				case 0xC486: {c=0x16;} break; // Ć
-				case 0xC498: {c=0x12;} break; // Ę
-				case 0xC581: {c=0x0B;} break; // Ł
-				case 0xC583: {c=0x0D;} break; // Ń
-				case 0xC393: {c=0x10;} break; // Ó
-				case 0xC59A: {c=0x04;} break; // Ś
-				case 0xC5B9: {c=0x18;} break; // Ź
-				case 0xC5BB: {c=0x00;} break; // Ż
-				case 0xC485: {c=0x01;} break; // ą
-				case 0xC487: {c=0x03;} break; // ć
-				case 0xC499: {c=0x05;} break; // ę
-				case 0xC582: {c=0x0C;} break; // ł
-				case 0xC584: {c=0x0E;} break; // ń
-				case 0xC3B3: {c=0x0F;} break; // ó
-				case 0xC59B: {c=0x13;} break; // ś
-				case 0xC5BA: {c=0x02;} break; // ź
-				case 0xC5BC: {c=0x1A;} break; // ż
-				case 0xC384: {c=0x19;} break; // Ä
-				case 0xC38B: {c='E';}  break; // Ë
-				case 0xC396: {c=0x07;} break; // Ö
-				case 0xC39C: {c=0x15;} break; // Ü
-				case 0xC3A4: {c=0x14;} break; // ä
-				case 0xC3AB: {c='e';}  break; // ë
-				case 0xC3B6: {c=0x06;} break; // ö
-				case 0xC3BC: {c=0x09;} break; // ü
-				case 0xC39F: {c=0x0A;} break; // ß
-				case 0xC2A3: {c=0x08;} break; // £
-				case 0xC2B1: {c=0x1B;} break; // ±
-				default: {c=0x20;} break;
-			};	
-		} else
-		if (c==0xE2)
-		{
-			unsigned int utf8=c;
-			utf8<<=8;
-			utf8|=name[j];
-			j++;
-			utf8<<=8;
-			utf8|=name[j];
-			j++;
-			switch (utf8)
-			{
-				case 0xE28690: {c=0x1E;} break; // ←
-				case 0xE28691: {c=0x1C;} break; // ↑
-				case 0xE28692: {c=0x1F;} break; // →				
-				case 0xE28693: {c=0x1D;} break; // ↓
-				default: {c=0x20;} break;
-			};			
+			//c=0x20;
+			break;
 		}
-		else {c=0x20;};
-		txt[i]=ATASCII2Internal(c);
+		else
+		{
+			DictEntry * de=&UTF8Trans[0];
+			while (de->key) {
+				if (c==UTF8(de->key)) {c=de->val; break;}
+				de++;
+			}
+		}
+
+		txt[i]=ATASCII2Internal((U8)c);
 	};
 }
 /*--------------------------------------------------------------------*/
