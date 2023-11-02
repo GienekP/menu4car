@@ -4,7 +4,7 @@ LFLAGS=apultra/libapultra.a -Lapultra -lapultra
 CFLAGS=-c -O3 -g -fomit-frame-pointer -Iapultra/src/libdivsufsort/include -Iapultra/src
 
 
-$(MAIN): $(MAIN).o apultra/libapultra.a
+$(MAIN): $(MAIN).o libapultra.a
 	$(CC) "$<" $(LFLAGS) -o $@
 
 
