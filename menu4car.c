@@ -381,9 +381,7 @@ static unsigned int pos=0;
 			}
 			if (do_compress==-1 || do_compress==2) {
 				// block compression, to do.
-				printf("HERE\n");
 				int comprsize2=compressAPLBlockByBlock(buf,size,bufcompr2);
-				printf("COMPRS %d\n",comprsize2);
 
 				if (comprsize2<comprsize || do_compress>0)
 				{
