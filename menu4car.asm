@@ -4,15 +4,16 @@
 ; (c) 2023 GienekP
 ;
 ;-----------------------------------------------------------------------
-ALLOC	= $1f
+ALLOC	= $24
 BANK    = ($0200-(DTACPYE-GETBYTE)+1)
 SRC     = ($0200-(DTACPYE-ADRSRC)+1)
+RSRC     = ($0200-(DTACPYE-RADRSRC)+1)
 DST     = ($0200-(DTACPYE-ADRDST)+1)
 POS     = ($200-ALLOC)
 CNT     = ($0201-ALLOC)
 GET_FROM_CAR     = ($0200-(DTACPYE-GETBYTE))
 PUT_RAM     = ($0200-(DTACPYE-PUTBYTE))
-CPY_RAMRAM     = ($0200-(DTACPYE-CPYBYTE))
+GET_RAM_BYTE     = ($0200-(DTACPYE-GETRBTE))
 RUN     = ($0200-(ENTRYE-ADRRUN)+1)
 BACK    = ($0200-(ENTRYE-ADRBCK)+1)
 ENTRY   = ($0200-(ENTRYE-ENTRYS))
@@ -996,7 +997,7 @@ DTACPYS
 ; THREE entry points:
 ; GETBYTE - gets byte from cart or whatever
 ; PUTBYTE - puts byte to ram
-; CPYBYTE - copies byte from ram to ram
+; GETRBTE - copies byte from ram to ram
 ; the goal was to keep one instance of ADRSRC and ADRDST
 
 GETBYTE	sta $D500 ; will be updated to bank number; entry point
@@ -1005,13 +1006,15 @@ ADRSRC	lda $FFFF
 	bcs ADRDST
 BACKC	sta $D500 
 	rts
+GETRBTE sta $D5FF ; entry point
+RADRSRC	lda $FFFF
+	clc
+	bcc BACKC
+
 PUTBYTE	sta $D5FF	; entry point
 ADRDST	sta $FFFF
 	clc
 	bcc BACKC
-CPYBYTE sec ; entry point
-	sta $D5FF
-	bcs ADRSRC
 
 DTACPYE
 ;--------------------------------------------
@@ -1024,16 +1027,6 @@ ADRRUN	jsr RESETCD
 		sta $D500
 ADRBCK	jmp EXIT
 ENTRYE
-
-;--------------------------------------------
-RAMRAMCPYS
-		sta $D5FF
-RADRSRC		lda $FFFF
-RADRDST		sta $FFFF
-		sta $D500
-		rts
-
-RAMRAMCPYE
 
 ;-----------------------------------------------------------------------		
 ; INITCART ROUTINE - back from old MaxFlash

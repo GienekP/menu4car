@@ -5,8 +5,7 @@
 cont
 .endm
 
-APL_INPUT	equ $f0
-APL_OUTPUT	equ $f2
+nextbytevec	equ $f0
 ringbuffer	equ $f2
 srcptr		equ $f4
 store_y		equ $f6
@@ -17,7 +16,6 @@ EBPL		equ $fa
 EBPH		equ $fb
 bl		equ $fc
 yieldvec	equ $fd
-nextbytevec	equ $ee
 
 
 
@@ -281,12 +279,8 @@ get_token_bit	asl	token
 		sta	token
 @		rts
 
-store		sty	store_y
-		ldy	#0
-		; jsr stack
-		sta	(APL_OUTPUT),y
-		ldy	store_y
-		inw	APL_OUTPUT
+store		jsr	PUTBYTE
+		inw	ADRDST
 		rts
 
 len01		ldx	#$01
@@ -295,18 +289,15 @@ len0203		ldy	#$00
 		sty	offsetH
 		iny
 
-domatch		lda	APL_OUTPUT
+domatch		lda	ADRDST
 		sec
 		sbc	offsetL
-		sta	SRCPTR
-		lda	APL_OUTPUT+1
+		sta	RADRSRC
+		lda	ADRDST+1
 		sbc	offsetH
-		sta	SRCPTR+1
-source		sty	store_y
-		ldy	#0
-		lda	(SRCPTR),y
-		ldy	store_y
-		inw	SRCPTR
+		sta	RADRSRC+1
+source		jsr	GET_RAM_BYTE		
+		inw	RADRSRC
 		jsr	store
 		dex	
 		bne	source
