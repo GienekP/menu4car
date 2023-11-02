@@ -1,0 +1,13 @@
+CC = gcc
+MAIN = menu4car
+
+universal_app: x86_app arm_app
+	lipo -create -output $(MAIN) x86_app arm_app
+	rm x86_app arm_app
+
+arm_app: $(MAIN).c
+	$(CC) $(MAIN).c -o arm_app -target arm64-apple-macos11
+
+x86_app: $(MAIN).c
+	$(CC) $(MAIN).c -o x86_app -target x86_64-apple-macos10.7
+

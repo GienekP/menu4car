@@ -5,17 +5,27 @@
 /* (c) 2023                                                           */
 /*--------------------------------------------------------------------*/
 #include <stdio.h>
+#include <ctype.h>
+#include <string.h>
+#include <sys/param.h>
+
+#include "libapultra.h"
 /*--------------------------------------------------------------------*/
 typedef unsigned char U8;
 /*--------------------------------------------------------------------*/
 #define CARMAX (1024*1024)
 #define FLASHMAX (512*1024)
+#define FLASHMAX (2*512*1024)
 #define BANKSIZE (0x2000)
 #define PATHLEN (0x400)
 #define NAMELEN (0x30)
+#define PARAMSLEN (8)
 #define DELIM	('|')
 /*--------------------------------------------------------------------*/
 #include "menu4car.h"
+#include "apultra/src/libapultra.h"
+/*--------------------------------------------------------------------*/
+int do_compress=1;
 /*--------------------------------------------------------------------*/
 U8 ATASCII2Internal(U8 a)
 {
@@ -48,6 +58,7 @@ DictEntry UTF8Trans[] = {
 };
 
 #define GETW(b,i) (b[(i)]|(b[(i)+1])<<8)
+#define PUTW(b,i,v) {b[(i)]=(v)&0xff;(b[(i)+1])=((v)<<8)&0xff;}
 unsigned int getUTF8(U8 **name)
 {
 			unsigned int utf8=(unsigned int)(U8)(**name);
@@ -105,28 +116,26 @@ unsigned int clearPos(U8 *data, unsigned int pos)
 }
 /*--------------------------------------------------------------------*/
 unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigned int pos,
-					const U8 *buf, unsigned int size)
+					const U8 *buf, unsigned int size,int flags)
 {
 	unsigned int i,ret=0;
 	unsigned int start,stop;
 	if (pos==0) 
 	{
-		start=BANKSIZE;
+		start=BANKSIZE; // first adr in first bank
 		stop=BANKSIZE+size;
-		data[4*pos+0]=0;
-		data[4*pos+1]=1;
-		data[4*pos+2]=0;
-		data[4*pos+3]=0;	
+		data[4*pos+0]=flags; // flags
+		data[4*pos+1]=1; // bank
+		data[4*pos+2]=0; // abs adr in bank hi (A000-based)
+		data[4*pos+3]=0; // abs adr in bank lo (A000-based)
 	}
 	else
 	{
-		unsigned int bh=data[4*pos];
-		unsigned int bl=data[4*pos+1];
+		unsigned int bank=data[4*pos+1];
 		unsigned int ah=data[4*pos+2];
 		unsigned int al=data[4*pos+3];
-		bh&=0x7F;
-		data[4*pos]=bh;
-		start=((((bh<<7)+bl)*BANKSIZE)|(((ah<<8)|al)&0x1FFF));
+		start=(((bank)*BANKSIZE)|(((ah<<8)|al)&0x1FFF));
+		data[4*pos]=flags&0x7f; // overwrite with current
 	};
 	stop=(start+size);
 	if (stop>carsize) 
@@ -138,7 +147,7 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 	else
 	{
 		for (i=0; i<size; i++) {data[start+i]=buf[i];};
-		data[4*pos+4]=(0x80|(stop/BANKSIZE/0x80));
+		data[4*pos+4]=0x80; // mark as last in advance.
 		data[4*pos+5]=((stop/BANKSIZE)&0x7F);
 		data[4*pos+6]=((stop>>8)&0x1F);
 		data[4*pos+7]=(stop&0xFF);
@@ -148,7 +157,7 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 		fillATASCII(&data[32*4+16*32+32*pos+6],(U8 *)name,24);
 	};
 
-	//printf("OFFSET: $%06x: file \"%s\", length $%04x bytes.\n",start,name,size);
+	printf("Adding at: $%06x: file \"%s\", length %d bytes... ",start,name,size);
 	return ret;
 }
 /*--------------------------------------------------------------------*/
@@ -180,7 +189,7 @@ unsigned int loadFile(const char *path, U8 *buf, unsigned int sizebuf)
 unsigned int repairFile(U8 *buf, unsigned int size)
 {
 	unsigned int i=0,j,first=0xFFFF,run=0,init=0,ret=size;
-	if (GETW(buf,0)==0xFFFF)
+	if (GETW(buf,0)==0xFFFF )
 	{
 		unsigned int a,b,start,stop;
 		i+=2;
@@ -216,42 +225,225 @@ unsigned int repairFile(U8 *buf, unsigned int size)
 		};
 	}
 	else
+	if (buf[0]==0xFF)
 	{
 		ret=0;
 	};
 	return ret;
 }
 /*--------------------------------------------------------------------*/
-unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char *path, U8 status)
+unsigned int compressAPLBlockByBlock(U8 *bufin, unsigned int retsize, U8 * bufout)
+{
+	unsigned int i=2, o=2, j;
+	if (GETW(bufin,0)==0xFFFF)
+	{
+		PUTW(bufout,0,0xFFFF);
+		unsigned int a,b,start,stop;
+
+		while (i<retsize) // all blocks are good and repaired before
+		{
+			start = GETW(bufin,i);
+			stop  = GETW(bufin,i+2);
+			PUTW(bufout,o,start);
+
+			int tsize=(1+stop-start);
+			int csize=0;
+
+			i+=4;
+			o+=4;
+
+			if (tsize>=32) {
+				for (j=o; j<MIN(o+tsize,FLASHMAX); j++) {bufout[j]=0;};
+
+				csize= apultra_compress(&bufin[i],
+						&bufout[o],
+						tsize,
+						FLASHMAX,
+						0,
+						0,
+						0, 
+						NULL,
+						NULL);
+			}
+			if (tsize>=32 && csize<tsize) {
+				PUTW(bufout,o-2,0);
+				o+=csize;
+				// ok, compressed in place
+			}
+			else { // copy tsize bytes; also sometimes overwrite with original if compressed is longer
+				PUTW(bufout,o-2,stop);
+				for (j=i; j<i+tsize; j++) {bufout[o++]=bufin[j];};
+			}
+			i+=tsize;
+		};
+		retsize=o;
+	}
+	else
+		retsize=0;
+	return retsize;
+}
+/*--------------------------------------------------------------------*/
+void process_types(const char * path, int * flags) {
+	// FFFF xex
+	// nagl ATR || ext atr - ATR
+	// nagl CART type 8kb || ext bin || ext car- CART
+	// nagl BASIC? - ext BAS
+}
+
+/*--------------------------------------------------------------------*/
+void process_params(const char * addparams) {
+	int i=0;
+	// default values
+	do_compress=-1;
+
+	while (i<strlen(addparams))
+	{
+		if (addparams[i]=='c')  {
+			i++;
+			switch (addparams[i]) {
+				case 'n':
+					do_compress=0;
+					break;
+				case 'a': // auto
+					do_compress=-1; 
+					break;
+				case '1':
+				case '2':
+					do_compress=addparams[i]-'0';
+					break;
+				case 0:
+					printf("Error: truncated option c.\n");
+					break;
+				default:
+					printf("Error: option c%c.\n",addparams[i]);
+					break;
+			}
+		}
+		i++;
+	} 
+}
+unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char *path, const char *addparams,  U8 status)
 {
 static unsigned int pos=0;
 	U8 buf[FLASHMAX];
+	U8 bufcompr[FLASHMAX];
+	U8 bufcompr2[FLASHMAX];
 	int advance=0;
+	static int osize=0;
+	static int ncsize=0;
+	int flags=0;
+
+	if (data==NULL) {
+		printf("Summary size taken by binaries: %d/0x%0x\n",osize,osize);
+		//if (do_compress) {
+			printf("not compressed size: %d/0x%0x\n",ncsize,ncsize);
+			printf("Compression ratio: %d%%\n",osize*100/ncsize);
+		//}
+		printf("Cartridge fill: %d%%\n",((osize+1)*200)/(2*(FLASHMAX-8192)));
+		return 0;
+	}
+
+	process_params(addparams);
+	process_types(path,&flags);
+
 	if (status)
 	{
 		unsigned int size=loadFile(path,buf,sizeof(buf)-8192-6);
 		size=repairFile(buf,size);
-		//saveRAW(buf,size);
-		if (size)
-		{
-			unsigned int over=insertPos(name,data,carsize,pos,buf,size);
-			advance=1;
-			if (over) {printf("Error: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;};
+		// compress file, get new size.
+		/**
+ * Compress memory
+ *
+ * @param pInputData pointer to input(source) data to compress
+ * @param pOutBuffer buffer for compressed data
+ * @param nInputSize input(source) size in bytes
+ * @param nMaxOutBufferSize maximum capacity of compression buffer
+ * @param nFlags compression flags (set to 0)
+ * @param nMaxWindowSize maximum window size to use (0 for default)
+ * @param nDictionarySize size of dictionary in front of input data (0 for none)
+ * @param progress progress function, called after compressing each block, or NULL for none
+ * @param pStats pointer to compression stats that are filled if this function is successful, or NULL
+ *
+ * @return actual compressed size, or -1 for error
+ */
+		if (size) {
+			int comprsize=0;
+			if (do_compress==-1 || do_compress==1) {
+				comprsize= apultra_compress(buf,
+						bufcompr,
+						size,
+						sizeof(bufcompr),
+						0,
+						255,//256 - cycle buffer size as well as compression window, one byte less works
+						0, 
+						NULL,
+						NULL);
+			}
+			if (do_compress==-1 || do_compress==2) {
+				// block compression, to do.
+				printf("HERE\n");
+				int comprsize2=compressAPLBlockByBlock(buf,size,bufcompr2);
+				printf("COMPRS %d\n",comprsize2);
+
+				if (comprsize2<comprsize || do_compress>0)
+				{
+					int j;
+					for (j=0; j<comprsize2; j++) {bufcompr[j]=bufcompr2[j];};
+					comprsize=comprsize2;
+
+				}
+			}
+
+			//saveRAW(buf,size);
+			if (do_compress && ((comprsize < size) || do_compress>=1)) // forced 
+			{
+				
+				flags|=((do_compress)<<4);
+				unsigned int over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags);
+				advance=1;
+				if (over) {
+					printf("skipped: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
+				}
+				else {
+					printf("compressed: \"%s\", length (compr/uncompr): %d/%d\n",name,comprsize,size);
+					osize+=comprsize;
+					ncsize+=size;
+				}
+
+
+			}
+			else if ((comprsize >= size)||!do_compress)
+			{
+				unsigned int over=insertPos(name,data,carsize,pos,buf,size,flags);
+				advance=1;
+				if (over) {
+					printf("skipped: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
+				}
+				else	{
+					printf("added.\n");
+					osize+=size;
+					ncsize+=size;
+				}
+			}
+			else
+			{clearPos(data,pos);};
 		}
-		else {clearPos(data,pos);};
 	}
 	else {clearPos(data,pos);};
 	pos+=advance;
 	return pos;
 }
 /*--------------------------------------------------------------------*/
-U8 readLine(FILE *pf,char *name, char *path)
+U8 readLine(FILE *pf,char *name, char *path, char *add)
 {
 	U8 status=0,rb;
 	char b[1];
 	unsigned int i;
 	for (i=0; i<NAMELEN; i++) {name[i]=0;};
-	for (i=0; i<NAMELEN; i++)
+	for (i=0; i<PATHLEN; i++) {path[i]=0;};
+	for (i=0; i<PARAMSLEN; i++) {add[i]=0;};
+
+	for (i=0; i<NAMELEN-1; i++)
 	{
 		b[0]=0;
 		if (feof(pf)) {i=NAMELEN;}
@@ -262,16 +454,16 @@ U8 readLine(FILE *pf,char *name, char *path)
 			if (rb==0x0D)
 			{
 				fread(b,sizeof(U8),sizeof(b),pf);
-				i=NAMELEN;
+				i=NAMELEN; // exit from loop
 			} else
 			if (rb==0x0A) {i=NAMELEN;} else
-			if (rb==DELIM) {i=NAMELEN; status=1;} else{name[i]=rb;};
+			if (rb==DELIM) {i=NAMELEN; status=1;}
+			else{name[i]=rb;};
 		};
 	};
 	if (status==1)
 	{
-		for (i=0; i<PATHLEN; i++) {path[i]=0;};
-		for (i=0; i<PATHLEN; i++)
+		for (i=0; i<PATHLEN-1; i++)
 		{
 			b[0]=0;
 			if (feof(pf)) {i=PATHLEN;}
@@ -281,10 +473,33 @@ U8 readLine(FILE *pf,char *name, char *path)
 				rb=b[0];
 				if (rb==0x0D)
 				{
-					fread(b,sizeof(U8),sizeof(b),pf);
-					i=PATHLEN;
+					fread(b,sizeof(U8),sizeof(b),pf); 
+					i=PATHLEN; // exit from loop
 				} else
-				if (rb==0x0A) {i=PATHLEN;} else {path[i]=rb;};	
+				if (rb==0x0A) {i=PATHLEN;} else
+				if (rb==DELIM) {i=PATHLEN; status=2;} else
+				{path[i]=rb;};
+			};
+		};
+	};
+	if (status==2)
+	{
+		for (i=0; i<PARAMSLEN-1; i++)
+		{
+			b[0]=0;
+			if (feof(pf)) {i=PARAMSLEN;}
+			else
+			{
+				fread(b,sizeof(U8),sizeof(b),pf);
+				rb=b[0];
+				if (rb==0x0D)
+				{
+					fread(b,sizeof(U8),sizeof(b),pf);
+					i=PARAMSLEN;
+				} else
+				if (rb==0x0A) {i=PARAMSLEN;}
+				else
+				{add[i]=rb;};	
 			};
 		};
 	};
@@ -293,18 +508,22 @@ U8 readLine(FILE *pf,char *name, char *path)
 /*--------------------------------------------------------------------*/
 void addData(U8 *data, unsigned int carsize, const char *filemenu)
 {
-	char name[NAMELEN],path[PATHLEN];
+	char name[NAMELEN],path[PATHLEN],addparams[PARAMSLEN];
 	FILE *pf;
 	unsigned int i;
 	pf=fopen(filemenu,"rb");
 	if (pf)
 	{
-		for (i=0; i<26; i++)
+		i=0;
+		while (i<26)
 		{
-			U8 status=readLine(pf,name,path);
+			U8 status=readLine(pf,name,path,addparams);
+			printf("Line read:'%s','%s','%s'\n",name,path,addparams);
 			if (name[0]=='#') continue;
-			addPos(data,carsize,name,path,status);
+			addPos(data,carsize,name,path,addparams,status);
+			i++;
 		};
+		addPos(0,0,0,0,0,0);
 		for (i=0; i<27; i++)
 		{
 			if (data[4*i]!=0xFF) {data[4*i+2]+=0xA0;};

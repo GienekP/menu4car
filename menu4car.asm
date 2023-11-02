@@ -4,19 +4,21 @@
 ; (c) 2023 GienekP
 ;
 ;-----------------------------------------------------------------------
-
+ALLOC	= $1f
 BANK    = ($0200-(DTACPYE-GETBYTE)+1)
 SRC     = ($0200-(DTACPYE-ADRSRC)+1)
 DST     = ($0200-(DTACPYE-ADRDST)+1)
-POS     = $01EB
-CNT     = $01EC
-GET     = ($0200-(DTACPYE-GETBYTE))
-PUT     = ($0200-(DTACPYE-PUTBYTE))
+POS     = ($200-ALLOC)
+CNT     = ($0201-ALLOC)
+GET_FROM_CAR     = ($0200-(DTACPYE-GETBYTE))
+PUT_RAM     = ($0200-(DTACPYE-PUTBYTE))
+CPY_RAMRAM     = ($0200-(DTACPYE-CPYBYTE))
 RUN     = ($0200-(ENTRYE-ADRRUN)+1)
 BACK    = ($0200-(ENTRYE-ADRBCK)+1)
 ENTRY   = ($0200-(ENTRYE-ENTRYS))
 
 ;-----------------------------------------------------------------------
+
 
 TMP     = $00
 CASINI  = $02 
@@ -227,8 +229,9 @@ pm		:+1024 dta $00
 ;
 ; CART MAIN CODE
 ;
+
 BEGIN	jsr TESTSEL
-		ldx #$15 ; $01EB - $01FF (21 bytes) on STACK for LOADER
+		ldx #ALLOC ; $01EB - $01FF (21 bytes) on STACK for LOADER
 		lda #$EA
 @		pha
 		dex
@@ -321,9 +324,7 @@ BEGIN	jsr TESTSEL
 		asl
 		tax
 		lda table,X
-		and #$80
-		cmp #$80
-		bne @-
+		bpl @-
 		;--------
 		; RUN if only one pos
 		ldx CNT
@@ -404,7 +405,6 @@ RESTORE	lda #$00
 		sta CRITIC
 		lda #$00
 		sta DMACTL
-		lda POS
 		jsr LOADPOS
 		
 		;--------	
@@ -540,55 +540,73 @@ CLICK	lda TMP
 
 		;--------	
 		; 4 bytes - MUL 4	
-LOADPOS	asl
-		asl
-		sta POS
+LOADPOS
+		asl POS
+		asl POS
 		jsr CopyCPY
-		lda POS
-		tax
-		clc
-		adc #$04
-		sta POS
-		lda table+1,X	; BANK
-		pha
-		lda table+2,X	; MSB
-		pha
-		lda table+3,X	; LSB
-		tax
-		pla
-		tay
-		pla
-		jsr SetSrc
 		
 		lda #$FF		; Clear RUNAD & INITAD
 		sta RUNAD
 		sta RUNAD+1
 		sta INITAD
 		sta INITAD+1
+
+		jsr SETPOSSRC
+		and #7
+		cmp	#0
+		beq	LOADXEX
+		cmp	#1
+		beq	LOADBOOT
+		cmp	#2
+		beq	LOADATR
+		cmp	#3
+		beq	LOADBASIC
+		cmp	#4
+		beq	LOADCAR
+
+LOADBOOT
+LOADATR
+LOADBASIC
+LOADCAR
+		jmp	RESETCD
+
 		
-		jsr GET
+LOADXEX		ldx	POS
+		lda	table,X
+		and	#$70
+		beq	READRAWXEX
+		cmp	#$20
+		beq	READRAWXEX
+		cmp	#$10
+		jeq	READAPL256XEX
+		jmp	RESETCD
+; --------------------------------------------------
+; read binary here
+; --------------------------------------------------
+READRAWXEX
+		jsr GET_FROM_CAR
 		cmp #$FF		; Chceck DOS Header
 		beq @+
+; --------------------------------------------------
+; uncompressed/raw read binary part
+; --------------------------------------------------
 ERRORWM	jmp RESETCD 	; Warm Reset if ERROR
 @		jsr IncSrc
-		jsr CmpSrc
 		bcs ERRORWM
-		jsr GET
+		jsr GET_FROM_CAR
 		cmp #$FF
+		beq LOOP
 		bne ERRORWM
 LOOP	jsr IncSrc
-		jsr CmpSrc
 		bcs ERRORWM
 		
-READBLC	jsr GET			; Read LSB
+READBLC	jsr GET_FROM_CAR			; Read LSB
 		pha
 		jsr IncSrc		; SRC++
-		jsr CmpSrc		; EOF(SRC)
 		bcs ERRORWM		; ERROR NoDATA
-		jsr GET			; Read HSB
+		jsr GET_FROM_CAR			; Read HSB
 		pha
 		jsr IncSrc
-		jsr CmpSrc
 		bcs ERRORWM		; ERROR NoDATA
 		pla
 		tay
@@ -596,26 +614,31 @@ READBLC	jsr GET			; Read LSB
 		tax
 		jsr SetDst		; Set Destination
 		
-		jsr GET
+		jsr GET_FROM_CAR
 		sta CNT			; Set Last Write LSB
 		jsr IncSrc
-		jsr CmpSrc
 		bcs ERRORWM
-		jsr GET
+		jsr GET_FROM_CAR
 		sta CNT+1		; Set Last Write MSB
 		jsr IncSrc
-		jsr CmpSrc
 		bcs ERRORWM	
-		
-TRANSF	jsr GET			; Read BYTE
+		lda CNT
+		ora CNT+1
+		bne TRANSF
+DECRTRANSF
+		; decomp stuff
+		jmp ENDBLK
+
+TRANSF		jsr GET_FROM_CAR			; Read BYTE
 		;sta COLBAK		; Write to "noise"
-		clc				; For Smart Stack Procedure
-		jsr PUT			; Write BYTE
+		;clc				; For Smart Stack Procedure
+		jsr PUT_RAM			; Write BYTE
 		jsr CmpDst		; Check Destination
 		bcs ENDBLK		; If last
-		jsr IncDst		; Prepare Destination for next write
-		jsr IncSrc		; Increment Source
-		jsr CmpSrc		; EOF(SRC)
+		inc DST			; Prepare Destination for next write
+		bne @+
+		inc DST+1
+@		jsr IncSrc		; Increment Source
 		bcs ERRORWM		; ERROR NoDATA
 		bcc	TRANSF		; Repeat transfer byte
 		
@@ -626,7 +649,6 @@ ENDBLK 	lda INITAD		; End DOS block
 		cmp #$FF
 		bne RUNPART		; Run INIT Procedure
 		jsr IncSrc		; Increment Source
-		jsr CmpSrc		; EOF(SRC)
 		bcc READBLC		; No EOF read next block
 		rts				; All data readed, back to RUNAD procedure
 		
@@ -669,37 +691,173 @@ RUNPART	lda BANK
 		sta BANK		; Restore BANK
 
 		jmp LOOP
+; --------------------------------------------------
+; compressed read binary part
+; --------------------------------------------------
+COMPRESSED_READ
+READAPL256XEX
+		; configure decompresor
+		lda	#$ff
+		sta	bl
+		lda	#$4
+		sta	ringbuffer+1
+		sta	srcptr+1
+		lda	#0
+		sta	ringbuffer
+		sta	srcptr
+		; uncompress first byte
+		mwa	#continue	yieldvec
+		jmp	aPL_depack
+continue
+		; we have got the first byte
+		; uncompress second byte
+		GET_COMP_BYTE
+
+		jmp CLOOP
+
+
+CERRORWM	jmp RESETCD		; fill-up code
+		bcs CERRORWM
+		GET_COMP_BYTE
+		cmp #$FF
+		bne CREADBLC
+CLOOP	;jsr IncSrc
+		bcs CERRORWM
+		
+CREADBLC	GET_COMP_BYTE			; Read LSB
+		bcc @+		;ok, there is data
+		rts				; All data readed, back to RUNAD procedure
+@		sta DST
+
+		GET_COMP_BYTE			; Read HSB
+		bcs CERRORWM		; ERROR NoDATA
+		sta DST+1
+		
+		GET_COMP_BYTE
+		bcs CERRORWM
+		sta CNT			; Set Last Write LSB
+
+		GET_COMP_BYTE
+		bcs CERRORWM	
+		sta CNT+1		; Set Last Write MSB
+		
+CTRANSF		GET_COMP_BYTE			; Read BYTE
+		nop
+		jcs CERRORWM		; ERROR NoDATA
+		;sta COLBAK		; Write to "noise"
+		;clc				; For Smart Stack Procedure
+		jsr PUT_RAM			; Write BYTE
+		; Check Destination
+		lda DST
+		cmp CNT
+		bne @+
+		lda DST+1
+		cmp CNT+1
+		beq CENDBLK		; If last
+@		inc DST			; Prepare Destination for next write
+		bne @+
+		inc DST+1
+@
+		bne	CTRANSF		; Repeat transfer byte
+		
+CENDBLK 
+		lda INITAD		; End DOS block
+		cmp #$FF		; New INITAD?
+		bne CRUNPART		; Run INIT Procedure
+		lda INITAD+1
+		cmp #$FF
+		bne CRUNPART		; Run INIT Procedure
+		jmp CREADBLC		; No EOF read next block
+		
+CRUNPART
+		lda	BANK
+		pha				; Store BANK
+		lda	SRC			; Store LSB
+		pha
+		lda	SRC+1		; Store MSB
+		pha
+		txa
+		pha
+		tya
+		pha
+
+		jsr CopyENT		; Copy ENTRY Procedure
+		lda INITAD
+		sta RUN
+		lda INITAD+1
+		sta RUN+1		; Copy INITAD
+		
+		sei
+		lda #$00
+		sta CRITIC
+		jsr ENTRY
+
+		lda #$01
+		sta CRITIC
+		lda #$00
+		sta DMACTL
+		lda TRIG3
+		sta GINTLK
+		cli				; Allow IRQ
+				
+		lda #$FF		; Clear INITAD for next detection
+		sta INITAD
+		sta INITAD+1
+
+		jsr CopyCPY
+		pla
+		tay
+		pla
+		tax
+		pla
+		sta	SRC+1		; Restore MSB
+		pla
+		sta	SRC			; Restore LSB
+		pla
+		sta	BANK		; Restore BANK
+		clc
+		jmp CLOOP
 		
 ;-----------------------------------------------------------------------		
-; Set Source
-SetSrc	sta BANK
-		stx SRC
-		sty SRC+1
+; Set Source by POSx4 value
+SETPOSSRC
+		ldx POS
+		lda table+1,X	; BANK ->A
+		sta BANK
+		lda table+2,X	; MSB ->Y
+		sta SRC+1
+		lda table+3,X	; LSB ->X
+		sta SRC
+		lda table,X
 		rts
+
+;-----------------------------------------------------------------------		
+; Set Source
+;SetSrc	sta BANK
+;		stx SRC
+;		sty SRC+1
+;		rts
 
 ;-----------------------------------------------------------------------		
 ; Inc Source
 IncSrc	inc SRC
 		bne @+
 		inc SRC+1
-		lda SRC+1
-		cmp #$C0
-		bne @+
+		bit SRC+1
+		bvc @+
 		lda #$A0
 		sta SRC+1
 		inc BANK
-@		rts
-
-;-----------------------------------------------------------------------		
-; Cmp Source
-CmpSrc	ldx POS
-		lda table+3,X
+@
+		; Cmp Source
+		ldx POS
+		lda table+3+4,X
 		cmp SRC
 		bne @+
-		lda table+2,X
+		lda table+2+4,X
 		cmp SRC+1
 		bne @+
-		lda table+1,X
+		lda table+1+4,X
 		cmp BANK
 		bne @+
 		sec
@@ -715,10 +873,10 @@ SetDst	stx DST
 
 ;-----------------------------------------------------------------------		
 ; Inc Destination
-IncDst	inc DST
-		bne @+
-		inc DST+1
-@		rts
+;IncDst	inc DST
+;		bne @+
+;		inc DST+1
+;@		rts
 
 ;-----------------------------------------------------------------------		
 ; Cmp Destination
@@ -758,6 +916,15 @@ CopyCPY	ldx #(DTACPYE-DTACPYS)
 		rts
 		
 ;-----------------------------------------------------------------------		
+; Copy RamRamCopy to Stack
+;CopyRamRamCopy		ldx #(RAMRAMCPYE-RAMRAMCPYS)
+;		lda RAMRAMCPYS-1,X
+;		sta $0200-(RAMRAMCPYE-RAMRAMCPYS+1),X
+;		dex
+;		bne @-
+;		rts
+		
+;-----------------------------------------------------------------------		
 ; Copy Entry to Stack
 CopyENT	ldx #(ENTRYE-ENTRYS)
 @		lda ENTRYS-1,X
@@ -783,6 +950,8 @@ CONTIN	rts
 ; Keyboard Table
 ;		A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
 KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,$2F,$28,$3E,$2D,$0B,$10,$2E,$16,$2B,$17
+;-----------------------------------------------------------------------
+		icl "apldecr_zp.asm"
 ;-----------------------------------------------------------------------		
 ;		ORG $B500
 		
@@ -815,17 +984,37 @@ CLPRE
 ;-----------------------------------------------------------------------		
 ; STACK CODE	
 DTACPYS
-PUTBYTE	sta $D5FF
-ADRDST	sta $FFFF
-		bcc BACKC
+;PUTBYTE	sta $D5FF
+;ADRDST	sta $FFFF
+;		bcc BACKC
+;GETBYTE	sta $D500
+;ADRSRC	lda $FFFF
 
-GETBYTE	sta $D500
+;BACKC	sta $D500
+;		rts
+
+; THREE entry points:
+; GETBYTE - gets byte from cart or whatever
+; PUTBYTE - puts byte to ram
+; CPYBYTE - copies byte from ram to ram
+; the goal was to keep one instance of ADRSRC and ADRDST
+
+GETBYTE	sta $D500 ; will be updated to bank number; entry point
+	clc
 ADRSRC	lda $FFFF
+	bcs ADRDST
+BACKC	sta $D500 
+	rts
+PUTBYTE	sta $D5FF	; entry point
+ADRDST	sta $FFFF
+	clc
+	bcc BACKC
+CPYBYTE sec ; entry point
+	sta $D5FF
+	bcs ADRSRC
 
-BACKC	sta $D500
-		rts
 DTACPYE
-;---
+;--------------------------------------------
 ENTRYS	sta $D5FF
 		lda TRIG3
 		sta GINTLK
@@ -835,6 +1024,16 @@ ADRRUN	jsr RESETCD
 		sta $D500
 ADRBCK	jmp EXIT
 ENTRYE
+
+;--------------------------------------------
+RAMRAMCPYS
+		sta $D5FF
+RADRSRC		lda $FFFF
+RADRDST		sta $FFFF
+		sta $D500
+		rts
+
+RAMRAMCPYE
 
 ;-----------------------------------------------------------------------		
 ; INITCART ROUTINE - back from old MaxFlash
