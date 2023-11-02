@@ -405,7 +405,7 @@ static unsigned int pos=0;
 					printf("skipped: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
 				}
 				else {
-					printf("compressed: \"%s\", length (compr/uncompr): %d/%d\n",name,comprsize,size);
+					printf("compressed: \"%s\", length (compr/uncompr): %d/%d, ratio %d%%\n",name,comprsize,size,comprsize*100/size);
 					osize+=comprsize;
 					ncsize+=size;
 				}
@@ -518,10 +518,14 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 		while (i<26)
 		{
 			U8 status=readLine(pf,name,path,addparams);
-			printf("Line read:'%s','%s','%s'\n",name,path,addparams);
 			if (name[0]=='#') continue;
-			addPos(data,carsize,name,path,addparams,status);
-			i++;
+			if (strlen(path)>0 && strlen(name)>0) {
+				printf("Line read:'%s','%s','%s'\n",name,path,addparams);
+				addPos(data,carsize,name,path,addparams,status);
+				i++;
+			}
+			else
+				break;
 		};
 		addPos(0,0,0,0,0,0);
 		for (i=0; i<27; i++)

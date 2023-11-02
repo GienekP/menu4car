@@ -298,15 +298,15 @@ len0203		ldy	#$00
 domatch		lda	APL_OUTPUT
 		sec
 		sbc	offsetL
-		sta	srcptr
+		sta	SRCPTR
 		lda	APL_OUTPUT+1
 		sbc	offsetH
-		sta	srcptr+1
+		sta	SRCPTR+1
 source		sty	store_y
 		ldy	#0
-		lda	(srcptr),y
+		lda	(SRCPTR),y
 		ldy	store_y
-		inw	srcptr
+		inw	SRCPTR
 		jsr	store
 		dex	
 		bne	source
