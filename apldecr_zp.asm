@@ -178,6 +178,8 @@ GET_BYTE
 .proc aPL_depack_blk
 		lda	#$80
 		sta	token
+		lda	#$ff
+		sta	bl
 literal		lsr	bl
 		jsr	GET_BYTE
 write		jsr	store
@@ -198,7 +200,8 @@ single_byte	lsr	bl			 ; single byte -> 111
 		beq	write
 		jmp	len01
 
-aPL_done	rts
+aPL_done	
+		rts
 
 short_block	jsr	GET_BYTE
 		lsr	@
@@ -279,8 +282,8 @@ get_token_bit	asl	token
 		sta	token
 @		rts
 
-store		jsr	PUTBYTE
-		inw	ADRDST
+store		jsr	PUT_RAM
+		inw	DST
 		rts
 
 len01		ldx	#$01
@@ -289,15 +292,15 @@ len0203		ldy	#$00
 		sty	offsetH
 		iny
 
-domatch		lda	ADRDST
+domatch		lda	DST
 		sec
 		sbc	offsetL
-		sta	RADRSRC
-		lda	ADRDST+1
+		sta	RSRC
+		lda	DST+1
 		sbc	offsetH
-		sta	RADRSRC+1
+		sta	RSRC+1
 source		jsr	GET_RAM_BYTE		
-		inw	RADRSRC
+		inw	RSRC
 		jsr	store
 		dex	
 		bne	source

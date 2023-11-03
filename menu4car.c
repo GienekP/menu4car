@@ -14,7 +14,6 @@
 typedef unsigned char U8;
 /*--------------------------------------------------------------------*/
 #define CARMAX (1024*1024)
-#define FLASHMAX (512*1024)
 #define FLASHMAX (2*512*1024)
 #define BANKSIZE (0x2000)
 #define PATHLEN (0x400)
@@ -58,7 +57,7 @@ DictEntry UTF8Trans[] = {
 };
 
 #define GETW(b,i) (b[(i)]|(b[(i)+1])<<8)
-#define PUTW(b,i,v) {b[(i)]=(v)&0xff;(b[(i)+1])=((v)<<8)&0xff;}
+#define PUTW(b,i,v) {b[(i)]=(v)&0xff;(b[(i)+1])=((v)>>8)&0xff;}
 unsigned int getUTF8(U8 **name)
 {
 			unsigned int utf8=(unsigned int)(U8)(**name);
@@ -178,13 +177,18 @@ unsigned int loadFile(const char *path, U8 *buf, unsigned int sizebuf)
 	return size;
 }
 /*--------------------------------------------------------------------*/
-/*void saveRAW(U8 *raw, unsigned int size)
+/*
+void saveRAW(U8 *raw, unsigned int size)
 {
+	static int licz=0;
+	char * name[1000];
 	FILE *pf;
-	pf=fopen("RAW.XEX","wb");
+	sprintf(name,"RAW%d.XEX",licz++);
+	pf=fopen(name,"wb");
 	fwrite(raw,1,size,pf);
 	fclose(pf);
-};*/
+};
+*/
 /*--------------------------------------------------------------------*/
 unsigned int repairFile(U8 *buf, unsigned int size)
 {
@@ -244,6 +248,8 @@ unsigned int compressAPLBlockByBlock(U8 *bufin, unsigned int retsize, U8 * bufou
 		{
 			start = GETW(bufin,i);
 			stop  = GETW(bufin,i+2);
+
+			int initrun=(start<=0x2e2) && (stop>=0x2e2);
 			PUTW(bufout,o,start);
 
 			int tsize=(1+stop-start);
@@ -264,8 +270,9 @@ unsigned int compressAPLBlockByBlock(U8 *bufin, unsigned int retsize, U8 * bufou
 						0, 
 						NULL,
 						NULL);
+				//saveRAW(&bufout[o],csize);
 			}
-			if (tsize>=32 && csize<tsize) {
+			if (tsize>=32 && csize<tsize && !initrun) {
 				PUTW(bufout,o-2,0);
 				o+=csize;
 				// ok, compressed in place
@@ -301,12 +308,10 @@ void process_params(const char * addparams) {
 		if (addparams[i]=='c')  {
 			i++;
 			switch (addparams[i]) {
-				case 'n':
-					do_compress=0;
-					break;
 				case 'a': // auto
 					do_compress=-1; 
 					break;
+				case '0':
 				case '1':
 				case '2':
 					do_compress=addparams[i]-'0';
@@ -368,6 +373,7 @@ static unsigned int pos=0;
  */
 		if (size) {
 			int comprsize=0;
+			int choosen_compress_method=0;
 			if (do_compress==-1 || do_compress==1) {
 				comprsize= apultra_compress(buf,
 						bufcompr,
@@ -378,6 +384,7 @@ static unsigned int pos=0;
 						0, 
 						NULL,
 						NULL);
+				choosen_compress_method=1;
 			}
 			if (do_compress==-1 || do_compress==2) {
 				// block compression, to do.
@@ -388,6 +395,7 @@ static unsigned int pos=0;
 					int j;
 					for (j=0; j<comprsize2; j++) {bufcompr[j]=bufcompr2[j];};
 					comprsize=comprsize2;
+					choosen_compress_method=2;
 
 				}
 			}
@@ -396,7 +404,7 @@ static unsigned int pos=0;
 			if (do_compress && ((comprsize < size) || do_compress>=1)) // forced 
 			{
 				
-				flags|=((do_compress)<<4);
+				flags|=((choosen_compress_method)<<4);
 				unsigned int over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags);
 				advance=1;
 				if (over) {

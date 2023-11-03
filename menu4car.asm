@@ -4,7 +4,7 @@
 ; (c) 2023 GienekP
 ;
 ;-----------------------------------------------------------------------
-ALLOC	= $24
+ALLOC	= $22
 BANK    = ($0200-(DTACPYE-GETBYTE)+1)
 SRC     = ($0200-(DTACPYE-ADRSRC)+1)
 RSRC     = ($0200-(DTACPYE-RADRSRC)+1)
@@ -602,18 +602,13 @@ LOOP	jsr IncSrc
 		bcs ERRORWM
 		
 READBLC	jsr GET_FROM_CAR			; Read LSB
-		pha
+		STA DST
 		jsr IncSrc		; SRC++
 		bcs ERRORWM		; ERROR NoDATA
 		jsr GET_FROM_CAR			; Read HSB
-		pha
+		sta DST+1
 		jsr IncSrc
 		bcs ERRORWM		; ERROR NoDATA
-		pla
-		tay
-		pla
-		tax
-		jsr SetDst		; Set Destination
 		
 		jsr GET_FROM_CAR
 		sta CNT			; Set Last Write LSB
@@ -628,7 +623,9 @@ READBLC	jsr GET_FROM_CAR			; Read LSB
 		bne TRANSF
 DECRTRANSF
 		; decomp stuff
-		jmp ENDBLK
+		jsr aPL_depack_blk
+		; compressed blocks never contain init/run addresses
+		jmp READBLC
 
 TRANSF		jsr GET_FROM_CAR			; Read BYTE
 		;sta COLBAK		; Write to "noise"
@@ -659,6 +656,10 @@ RUNPART	lda BANK
 		pha
 		lda SRC+1		; Store MSB
 		pha
+		txa
+		pha
+		tya
+		pha
 
 		jsr CopyENT		; Copy ENTRY Procedure
 		lda INITAD
@@ -684,6 +685,10 @@ RUNPART	lda BANK
 		sta INITAD+1
 
 		jsr CopyCPY
+		pla
+		tay
+		pla
+		tax
 		pla
 		sta SRC+1		; Restore MSB
 		pla
