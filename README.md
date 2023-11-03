@@ -22,6 +22,16 @@ When file .txt is ready, invoke:
 
 Then outcartimage.car is a cart image MAXFLASH (type 42) compatible.
 
-##Build the executables:
-    type "make" to make dependences (apultra library) and the menu4car itself
-    Optionally go to the tools tirectory and type "make" to build homesoft atr converter tool. This tool outputs all the games and corresponding txt file with file list.
+## Build the executables:
+
+To get new repo, type in terminal:
+    git clone https://github.com/GienekP/menu4car.git
+
+To init submodules, type:
+    cd menu4car
+    git submodule init
+    git submodule update
+
+Then type "make" to make dependences (apultra library) and the menu4car itself.
+
+Optionally go to the "tools" tirectory and type "make" to build homesoft atr converter tool. This tool outputs all the games and corresponding txt file with file list.
