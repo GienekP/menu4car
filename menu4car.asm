@@ -4,7 +4,7 @@
 ; (c) 2023 GienekP
 ;
 ;-----------------------------------------------------------------------
-ALLOC	= $22
+ALLOC	= $1f
 BANK    = ($0200-(DTACPYE-GETBYTE)+1)
 SRC     = ($0200-(DTACPYE-ADRSRC)+1)
 RSRC     = ($0200-(DTACPYE-RADRSRC)+1)
@@ -1006,9 +1006,7 @@ DTACPYS
 ; the goal was to keep one instance of ADRSRC and ADRDST
 
 GETBYTE	sta $D500 ; will be updated to bank number; entry point
-	clc
 ADRSRC	lda $FFFF
-	bcs ADRDST
 BACKC	sta $D500 
 	rts
 GETRBTE sta $D5FF ; entry point
