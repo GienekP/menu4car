@@ -7,7 +7,7 @@ Games are to be in standard Atari Dos binary.
 The example file menu4car.txt contains an input in form of sort of csv file, separated by "|" char. It is an UTF-8 encoded file with Polish diacritical letters handling as well as some German letters too.
 
 The first field is the name of the game in readable form.
-The second field is the path to the binary executable.
+The second field is the path to the DOS binary executable (in the future more file types will be handled)
 The third optional field are the options. For now:
     * c0 - no compression
     * c1 - apl 256-byte window compression,
@@ -18,7 +18,7 @@ For now maximum 26 games may be added. Sometimes some game does not work with co
 
 When file .txt is ready, invoke:
 
-./menu4car menu4car.txt outcartimage.car
+   ./menu4car menu4car.txt outcartimage.car
 
 Then outcartimage.car is a cart image MAXFLASH (type 42) compatible.
 
