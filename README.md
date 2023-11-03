@@ -25,9 +25,11 @@ Then outcartimage.car is a cart image MAXFLASH (type 42) compatible.
 ## Build the executables:
 
 To get new repo, type in terminal:
+
     git clone https://github.com/GienekP/menu4car.git
 
 To init submodules, type:
+
     cd menu4car
     git submodule init
     git submodule update
