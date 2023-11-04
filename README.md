@@ -11,10 +11,10 @@ The second field is the path to the DOS binary executable (in the future more fi
 The third optional field are the options. For now:
     * c0 - no compression
     * c1 - apl 256-byte window compression,
-    * c2 - apl block by block compression
-    * ca - auto - gets the shortest compressed version from above
+    * c2 - apl every DOS block (long enough) compression
+    * ca - auto - gets the shortest compressed version (or uncompressed) from above
 
-For now maximum 26 games may be added. Sometimes some game does not work with compression, please add c0 as the option then.
+For now maximum 26 games may be added. Sometimes some game does not work with compression (what games?), please add c0 as the option then.
 
 When file .txt is ready, invoke:
 

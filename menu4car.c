@@ -411,7 +411,7 @@ static unsigned int pos=0;
 					printf("skipped: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
 				}
 				else {
-					printf("compressed: \"%s\", length (compr/uncompr): %d/%d, ratio %d%%\n",name,comprsize,size,comprsize*100/size);
+					printf("compressed: \"%s\", method %d, length (compr/uncompr): %d/%d, ratio %d%%\n",name,choosen_compress_method,comprsize,size,comprsize*100/size);
 					osize+=comprsize;
 					ncsize+=size;
 				}
