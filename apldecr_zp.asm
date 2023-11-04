@@ -5,9 +5,6 @@
 cont
 .endm
 
-ringbuffer	equ ZPALLOC
-srcptr		equ ZPALLOC+2
-
 .proc aPL_depack
 		lda	#$80
 		sta	token
@@ -18,13 +15,13 @@ literal		lsr	bl
 		jsr	GET_BYTE
 write		jsr	store
 nxt_token	jsr	get_token_bit
-		bcc	literal                      ; literal     -> 0
+		bcc	literal			; literal -> 0
 		jsr	get_token_bit
-		bcc	block                        ; block       -> 10
+		bcc	block			; block -> 10
 		jsr	get_token_bit
-		bcc	short_block	              ; short block -> 110
+		bcc	short_block		; short block -> 110
 
-single_byte	lsr	bl		           ; single byte -> 111
+single_byte	lsr	bl			; single byte -> 111
 		lda	#$10
 @		pha
 		jsr	get_token_bit
@@ -77,7 +74,7 @@ normal1
 lenffff		iny
 		sec
 		ror	bl
-		bne	domatch   ;          zawsze
+		bne	domatch	;zawsze
 
 getgamma	lda	#$00
 		pha
@@ -104,15 +101,8 @@ get_token_bit	asl	token
 		sta	token
 @		rts
 
-store		sty	store_y
-		ldy	#0
-		sta	(ringbuffer),y
-		; rts to second adress and
-		; fill the continue vector
-		; with this static address
-		ldy	store_y
-teststop
-		inc	ringbuffer
+store		jsr	PUTCB
+		inc	CBUFFER
 		; Here handler which does something with byte.
 		; Even binary load automata may be placed here.
 		; this is for testing.
@@ -126,17 +116,14 @@ len0203		ldy	#$00
 		sta	offsetL 
 		iny
 
-domatch		lda	ringbuffer
+domatch		lda	CBUFFER
 		sec
 		sbc	offsetL
-		sta	srcptr
-source		sty	store_y
-		ldy	#0
-		lda	(srcptr),y
-		ldy	store_y
-		inc	srcptr
+		sta	CBUFSRC
+source	
+		JSR	GETSRCCB
+		inc	CBUFSRC
 		jsr	store
-nxt1
 		dex	
 		bne	source
 		dey	

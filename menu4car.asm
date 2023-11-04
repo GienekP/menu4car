@@ -7,8 +7,12 @@
 ALLOC	= ($1f+$b)
 BANK    = ($0200-(DTACPYE-GETBYTE)+1)
 SRC     = ($0200-(DTACPYE-ADRSRC)+1)
-RSRC    = ($0200-(DTACPYE-RADRSRC)+1)
+RSRC    = ($0200-(DTACPYE-ADRRSRC)+1)
 DST     = ($0200-(DTACPYE-ADRDST)+1)
+
+CBUFFER = ($0200-(DTA256CPYE-CYCL256)+1)
+CBUFSRC = ($0200-(DTA256CPYE-SRCP256)+1)
+
 POS     = ($200-ALLOC)
 CNT     = ($0201-ALLOC)
 nextbytevec = ($0203-ALLOC)
@@ -23,6 +27,11 @@ bl      = ($020d-ALLOC)
 GET_FROM_CAR     = ($0200-(DTACPYE-GETBYTE))
 PUT_RAM     = ($0200-(DTACPYE-PUTBYTE))
 GET_RAM_BYTE     = ($0200-(DTACPYE-GETRBTE))
+
+PUTCB	 = ($0200-(DTA256CPYE-CYCL256))
+GETSRCCB = ($0200-(DTA256CPYE-SRCP256))
+
+
 RUN     = ($0200-(ENTRYE-ADRRUN)+1)
 BACK    = ($0200-(ENTRYE-ADRBCK)+1)
 ENTRY   = ($0200-(ENTRYE-ENTRYS))
@@ -554,7 +563,6 @@ CLICK	lda TMP
 LOADPOS
 		asl POS
 		asl POS
-		jsr CopyCPY
 		
 		lda #$FF		; Clear RUNAD & INITAD
 		sta RUNAD
@@ -562,7 +570,8 @@ LOADPOS
 		sta INITAD
 		sta INITAD+1
 
-		jsr SETPOSSRC
+		ldx POS
+		lda table,X
 		and #7
 		cmp	#0
 		beq	LOADXEX
@@ -595,6 +604,9 @@ LOADXEX		ldx	POS
 ; read binary here
 ; --------------------------------------------------
 READRAWXEX
+		jsr CopyCPY
+		jsr SETPOSSRC
+
 		jsr GET_FROM_CAR
 		cmp #$FF		; Chceck DOS Header
 		beq @+
@@ -711,15 +723,12 @@ RUNPART	lda BANK
 ; --------------------------------------------------
 COMPRESSED_READ
 READAPL256XEX
+		jsr CopyCPY256
+		jsr SETPOSSRC
+
 		; configure decompresor
 		lda	#$ff
 		sta	bl
-		lda	#$4
-		sta	ringbuffer+1
-		sta	srcptr+1
-		lda	#0
-		sta	ringbuffer
-		sta	srcptr
 		; uncompress first byte
 		mwa	#continue	yieldvec
 		jmp	aPL_depack
@@ -758,7 +767,7 @@ CREADBLC	GET_COMP_BYTE			; Read LSB
 		
 CTRANSF		GET_COMP_BYTE			; Read BYTE
 		nop
-		jcs CERRORWM		; ERROR NoDATA
+		bcs CERRORWM		; ERROR NoDATA
 		;sta COLBAK		; Write to "noise"
 		;clc				; For Smart Stack Procedure
 		jsr PUT_RAM			; Write BYTE
@@ -791,10 +800,15 @@ CRUNPART
 		pha
 		lda	SRC+1		; Store MSB
 		pha
+		lda	CBUFFER
+		pha
+		lda	CBUFSRC
+		pha
 		txa
 		pha
 		tya
 		pha
+
 
 		jsr CopyENT		; Copy ENTRY Procedure
 		lda INITAD
@@ -819,11 +833,15 @@ CRUNPART
 		sta INITAD
 		sta INITAD+1
 
-		jsr CopyCPY
+		jsr CopyCPY256
 		pla
 		tay
 		pla
 		tax
+		pla
+		sta	CBUFSRC
+		pla
+		sta	CBUFFER
 		pla
 		sta	SRC+1		; Restore MSB
 		pla
@@ -843,7 +861,6 @@ SETPOSSRC
 		sta SRC+1
 		lda table+3,X	; LSB ->X
 		sta SRC
-		lda table,X
 		rts
 
 ;-----------------------------------------------------------------------		
@@ -931,6 +948,15 @@ CopyCPY	ldx #(DTACPYE-DTACPYS)
 		rts
 		
 ;-----------------------------------------------------------------------		
+; Copy Copy256 to Stack
+CopyCPY256	ldx #(DTA256CPYE-DTA256CPYS)
+@		lda DTA256CPYS-1,X
+		sta $0200-(DTA256CPYE-DTA256CPYS+1),X
+		dex
+		bne @-
+		rts
+		
+;-----------------------------------------------------------------------		
 ; Copy Entry to Stack
 CopyENT	ldx #(ENTRYE-ENTRYS)
 @		lda ENTRYS-1,X
@@ -963,7 +989,7 @@ KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,
 		
 ; DCART	:+256 dta $EA
 ;-----------------------------------------------------------------------		
-		ORG $BF80
+		ORG $BF70
 ;-----------------------------------------------------------------------		
 ; $0400 CODE
 ; CLR $A000 - $BFFF
@@ -988,17 +1014,8 @@ NEWPAG	lda #$00
 		rts
 CLPRE		
 ;-----------------------------------------------------------------------		
-; STACK CODE	
+; STACK CODE FOR NORMAL AND BLOCK COMPRESSED
 DTACPYS
-;PUTBYTE	sta $D5FF
-;ADRDST	sta $FFFF
-;		bcc BACKC
-;GETBYTE	sta $D500
-;ADRSRC	lda $FFFF
-
-;BACKC	sta $D500
-;		rts
-
 ; THREE entry points:
 ; GETBYTE - gets byte from cart or whatever
 ; PUTBYTE - puts byte to ram
@@ -1009,17 +1026,42 @@ GETBYTE	sta $D500 ; will be updated to bank number; entry point
 ADRSRC	lda $FFFF
 BACKC	sta $D500 
 	rts
-GETRBTE sta $D5FF ; entry point
-RADRSRC	lda $FFFF
-	clc
-	bcc BACKC
-
 PUTBYTE	sta $D5FF	; entry point
 ADRDST	sta $FFFF
 	clc
 	bcc BACKC
+GETRBTE sta $D5FF ; entry point
+	clc
+ADRRSRC	lda $FFFF
+	bcc BACKC
 
 DTACPYE
+;-----------------------------------------------------------------------		
+; STACK CODE FOR COMPRESSED 256-byte Windowed
+DTA256CPYS
+; FOUR entry points:
+; GETBYTE - gets byte from cart or whatever
+; PUTBYTE - puts byte to ram
+;  - copies byte from ram to ram
+; the goal was to keep one instance of ADRSRC and ADRDST
+; names are prefixed to avoid double declaration
+; first code part must be a duplicate of previous block
+; cyclic buffer procs must fit into place of GETRBTE proc and substitutes it.
+_GETBYTE	sta $D500 ; will be updated to bank number; entry point
+_ADRSRC	lda $FFFF
+_BACKC	sta $D500 
+	rts
+_PUTBYTE	sta $D5FF	; entry point
+_ADRDST	sta $FFFF
+	clc
+	bcc _BACKC
+CYCL256 sta $500 ; entry point
+	rts
+SRCP256	lda $500 ; entry point
+	rts
+	nop	;IMPORTANT to get the same size as previous code section
+
+DTA256CPYE
 ;--------------------------------------------
 ENTRYS	sta $D5FF
 		lda TRIG3
