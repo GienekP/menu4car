@@ -13,10 +13,10 @@ srcptr		equ ZPALLOC+2
 		sta	token
 		lda	#$ff
 		sta	bl
+		mwa	#rtsfromthis	nextbytevec
 literal		lsr	bl
 		jsr	GET_BYTE
-write		mwy	#nxt_token	nextbytevec
-		jmp	store
+write		jsr	store
 nxt_token	jsr	get_token_bit
 		bcc	literal                      ; literal     -> 0
 		jsr	get_token_bit
@@ -110,7 +110,6 @@ store		sty	store_y
 		; rts to second adress and
 		; fill the continue vector
 		; with this static address
-		;mwy	#rtsfromthis	nextbytevec
 		ldy	store_y
 teststop
 		inc	ringbuffer
@@ -133,11 +132,10 @@ domatch		lda	ringbuffer
 		sta	srcptr
 source		sty	store_y
 		ldy	#0
-		mwa	#nxt1	nextbytevec
 		lda	(srcptr),y
 		ldy	store_y
 		inc	srcptr
-		jmp	store
+		jsr	store
 nxt1
 		dex	
 		bne	source
