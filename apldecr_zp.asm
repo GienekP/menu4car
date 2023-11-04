@@ -5,23 +5,14 @@
 cont
 .endm
 
-nextbytevec	equ $f0
-ringbuffer	equ $f2
-srcptr		equ $f4
-store_y		equ $f6
-token		equ $f7
-offsetL		equ $f8
-offsetH		equ $f9
-EBPL		equ $fa
-EBPH		equ $fb
-bl		equ $fc
-yieldvec	equ $fd
-
-
+ringbuffer	equ ZPALLOC
+srcptr		equ ZPALLOC+2
 
 .proc aPL_depack
-		lda    #$80
+		lda	#$80
 		sta	token
+		lda	#$ff
+		sta	bl
 literal		lsr	bl
 		jsr	GET_BYTE
 write		mwy	#nxt_token	nextbytevec

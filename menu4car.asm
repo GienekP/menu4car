@@ -4,13 +4,22 @@
 ; (c) 2023 GienekP
 ;
 ;-----------------------------------------------------------------------
-ALLOC	= $1f
+ALLOC	= ($1f+$b)
 BANK    = ($0200-(DTACPYE-GETBYTE)+1)
 SRC     = ($0200-(DTACPYE-ADRSRC)+1)
-RSRC     = ($0200-(DTACPYE-RADRSRC)+1)
+RSRC    = ($0200-(DTACPYE-RADRSRC)+1)
 DST     = ($0200-(DTACPYE-ADRDST)+1)
 POS     = ($200-ALLOC)
 CNT     = ($0201-ALLOC)
+nextbytevec = ($0203-ALLOC)
+yieldvec = ($0205-ALLOC)
+store_y	 = ($0207-ALLOC)
+token	= ($0208-ALLOC)
+offsetL = ($0209-ALLOC)
+offsetH = ($020a-ALLOC)
+EBPL    = ($020b-ALLOC)
+EBPH    = ($020c-ALLOC)
+bl      = ($020d-ALLOC)
 GET_FROM_CAR     = ($0200-(DTACPYE-GETBYTE))
 PUT_RAM     = ($0200-(DTACPYE-PUTBYTE))
 GET_RAM_BYTE     = ($0200-(DTACPYE-GETRBTE))
@@ -21,6 +30,7 @@ ENTRY   = ($0200-(ENTRYE-ENTRYS))
 ;-----------------------------------------------------------------------
 
 
+ZPALLOC = $24
 TMP     = $00
 CASINI  = $02 
 WARMST  = $08
@@ -666,7 +676,6 @@ RUNPART	lda BANK
 		sta RUN
 		lda INITAD+1
 		sta RUN+1		; Copy INITAD
-		
 		sei
 		lda #$00
 		sta CRITIC
@@ -920,15 +929,6 @@ CopyCPY	ldx #(DTACPYE-DTACPYS)
 		dex
 		bne @-
 		rts
-		
-;-----------------------------------------------------------------------		
-; Copy RamRamCopy to Stack
-;CopyRamRamCopy		ldx #(RAMRAMCPYE-RAMRAMCPYS)
-;		lda RAMRAMCPYS-1,X
-;		sta $0200-(RAMRAMCPYE-RAMRAMCPYS+1),X
-;		dex
-;		bne @-
-;		rts
 		
 ;-----------------------------------------------------------------------		
 ; Copy Entry to Stack

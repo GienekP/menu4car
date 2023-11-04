@@ -23,4 +23,5 @@ libapultra.a:
 clean:
 	rm menu4car
 	rm *.o
+	rm *.lab
 	$(MAKE) -C apultra clean
