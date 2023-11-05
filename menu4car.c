@@ -23,6 +23,12 @@ typedef unsigned char U8;
 #define PARAMSLEN (8)
 #define DELIM	('|')
 #define MAX_ENTRIES	26
+
+#define         SCREENDATA_OFFSET	0x0000
+#define         DATAARRAY_OFFSET	0x0C20
+#define         COLORTABLE_OFFSET	0x0DD4
+#define         PICTURE_DATA_OFFSET	0x0E00
+#define         FONT_OFFSET		0x1000
 /*--------------------------------------------------------------------*/
 #include "menu4car.h"
 #include "apultra/src/libapultra.h"
@@ -110,14 +116,18 @@ void fillATASCII(U8 *txt, const U8 *name, unsigned int limit)
 /*--------------------------------------------------------------------*/
 unsigned int clearPos(U8 *data, unsigned int pos)
 {
-	unsigned int k=(32*4+16*32+32*pos);
+	int SC_POS_OFFSET=SCREENDATA_OFFSET+32*pos;
+	int DA_POS_OFFSET=DATAARRAY_OFFSET+4*pos;
+	unsigned int k=(SC_POS_OFFSET);
+	// zeroify letter and dot
 	data[k+3]=0;
 	data[k+4]=0;
-	data[4*pos]|=0x80;
-	data[4*(pos+1)]=data[4*pos];
-	data[4*(pos+1)+1]=data[4*pos+1];
-	data[4*(pos+1)+2]=data[4*pos+2];
-	data[4*(pos+1)+3]=data[4*pos+3];
+	// 
+	data[DA_POS_OFFSET]|=0x80;
+	data[DA_POS_OFFSET+4]=data[DA_POS_OFFSET];
+	data[DA_POS_OFFSET+5]=data[DA_POS_OFFSET+1];
+	data[DA_POS_OFFSET+6]=data[DA_POS_OFFSET+2];
+	data[DA_POS_OFFSET+7]=data[DA_POS_OFFSET+3];
 	return (pos+1);
 }
 /*--------------------------------------------------------------------*/
@@ -126,22 +136,24 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 {
 	unsigned int i,ret=0;
 	unsigned int start,stop;
+	int SC_POS_OFFSET=SCREENDATA_OFFSET+32*pos;
+	int DA_POS_OFFSET=DATAARRAY_OFFSET+4*pos;
 	if (pos==0) 
 	{
 		start=BANKSIZE; // first adr in first bank
 		stop=BANKSIZE+size;
-		data[4*pos+0]=flags; // flags
-		data[4*pos+1]=1; // bank
-		data[4*pos+2]=0; // abs adr in bank hi (A000-based)
-		data[4*pos+3]=0; // abs adr in bank lo (A000-based)
+		data[DA_POS_OFFSET+0]=flags; // flags
+		data[DA_POS_OFFSET+1]=1; // bank
+		data[DA_POS_OFFSET+2]=0; // abs adr in bank hi (A000-based)
+		data[DA_POS_OFFSET+3]=0; // abs adr in bank lo (A000-based)
 	}
 	else
 	{
-		unsigned int bank=data[4*pos+1];
-		unsigned int ah=data[4*pos+2];
-		unsigned int al=data[4*pos+3];
+		unsigned int bank=data[DA_POS_OFFSET+1];
+		unsigned int ah  =data[DA_POS_OFFSET+2];
+		unsigned int al  =data[DA_POS_OFFSET+3];
 		start=(((bank)*BANKSIZE)|(((ah<<8)|al)&0x1FFF));
-		data[4*pos]=flags&0x7f; // overwrite with current
+		data[DA_POS_OFFSET]=flags&0x7f; // overwrite with current
 	};
 	stop=(start+size);
 	if (stop>carsize) 
@@ -153,14 +165,14 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 	else
 	{
 		for (i=0; i<size; i++) {data[start+i]=buf[i];};
-		data[4*pos+4]=0x80; // mark as last in advance.
-		data[4*pos+5]=((stop/BANKSIZE)&0x7F);
-		data[4*pos+6]=((stop>>8)&0x1F);
-		data[4*pos+7]=(stop&0xFF);
+		data[DA_POS_OFFSET+4]=0x80; // mark as last in advance.
+		data[DA_POS_OFFSET+5]=((stop/BANKSIZE)&0x7F);
+		data[DA_POS_OFFSET+6]=((stop>>8)&0x1F);
+		data[DA_POS_OFFSET+7]=(stop&0xFF);
 
-		data[32*4+16*32+32*pos+3]='A'+pos-0x20;
-		data[32*4+16*32+32*pos+4]='.'-0x20;
-		fillATASCII(&data[32*4+16*32+32*pos+6],(U8 *)name,24);
+		data[SC_POS_OFFSET+3]='A'+pos-0x20;
+		data[SC_POS_OFFSET+4]='.'-0x20;
+		fillATASCII(&data[SC_POS_OFFSET+6],(U8 *)name,24);
 	};
 
 	if (be_verbose)
@@ -558,7 +570,8 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 		addPos(0,carsize,0,0,0,0);
 		for (i=0; i<MAX_ENTRIES+1; i++)
 		{
-			if (data[4*i]!=0xFF) {data[4*i+2]+=0xA0;};
+			int DA_POS_OFFSET=DATAARRAY_OFFSET+4*i;
+			if (data[DA_POS_OFFSET]!=0xFF) {data[DA_POS_OFFSET+2]+=0xA0;};
 		};
 		fclose(pf);
 	}
@@ -654,7 +667,8 @@ void addLogo(U8 *cardata, const char *logofile, unsigned int size, unsigned int 
 					b<<=(8/nop);
 					b+=pix[0];
 				};
-				cardata[32*4+i]=b;
+				cardata[PICTURE_DATA_OFFSET+i]=b;
+				if (i>=512) break;
 			};
 			fclose(pf);
 		};
@@ -669,12 +683,12 @@ void fillData(U8 *cardata, unsigned int size, U8 byte)
 /*--------------------------------------------------------------------*/
 void addFont(U8 * cardata, const char * fontpath)
 {
-	loadFile(fontpath,&cardata[0x800],1024);
+	loadFile(fontpath,&cardata[FONT_OFFSET],1024);
 }
 /*--------------------------------------------------------------------*/
 void addCTable(U8 * cardata, const char * colortablefile)
 {
-	loadFile(colortablefile,&cardata[0x7F0],16);
+	loadFile(colortablefile,&cardata[COLORTABLE_OFFSET],16);
 }
 /*--------------------------------------------------------------------*/
 void menu4car(const char * filemenu, const char * logo, const char * colortablefile, const char * fontpath, const char * carname, int cart_size, int default_do_compress)
