@@ -108,7 +108,10 @@ screen_data
 ;-----------------------------------------------------------------------		
 ; Table of files
 ; BH BL HS LS
-table	:+(97) dta 0,0,0,0
+table0	:+(105) dta 0
+table1	:+(105) dta 0
+table2	:+(105) dta 0
+table3	:+(105) dta 0
 
 ;-----------------------------------------------------------------------		
 ; ANTIC PROGRAM
@@ -118,11 +121,6 @@ antic	:+1 dta $70
 		:+26 dta $02
 		dta $41,<antic,>antic
 		
-
-;-----------------------------------------------------------------------		
-; CTABLE
-		.print "#define	COLORTABLE_OFFSET	0x",*-$a000
-ctable		dta $06,$16,$26,$36,$46,$56,$66,$76,$86,$96,$a6,$b6,$c6,$d6,$e6,$f6
 
 ;-----------------------------------------------------------------------		
 ; Menu4CAR Logo
@@ -237,6 +235,11 @@ fonts		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $18, $18, $18, $18, $00,
 ;pm		:+1024 dta $00
 
 ;-----------------------------------------------------------------------		
+; CTABLE
+		.print "#define	COLORTABLE_OFFSET	0x",*-$a000
+ctable		dta $06,$16,$26,$36,$46,$56,$66,$76,$86,$96,$a6,$b6,$c6,$d6,$e6,$f6
+
+;-----------------------------------------------------------------------		
 ;
 ; CART MAIN CODE
 ;
@@ -327,22 +330,17 @@ BEGIN	jsr TESTSEL
 		jsr CopyCLR
 		;--------
 		; Chose XEX
-		lda #$00
-		sta CNT
-@		inc CNT
-		lda CNT
-		asl
-		asl
-		tax
-		lda table,X
+		ldx #$ff
+@		inx
+		lda table0,X
 		bpl @-
 		;--------
 		; RUN if only one pos
-		ldx CNT
-		dex
+		stx CNT
 		sta POS
+		dex
 		beq RESTORE
-		lda #$00
+		lda #$0
 		sta TMP
 		sta TMP+1
 		;--------	
@@ -471,7 +469,7 @@ PAINT	lda TMP
 
 @		cmp VCOUNT
 		bne @-			
-		lda #$08
+		lda #$0c
 		sta COLPF2
 		lda #$0E
 		sta COLPF1
@@ -552,9 +550,6 @@ CLICK	lda TMP
 		;--------	
 		; 4 bytes - MUL 4	
 LOADPOS
-		asl POS
-		asl POS
-		
 		lda #$FF		; Clear RUNAD & INITAD
 		sta RUNAD
 		sta RUNAD+1
@@ -562,7 +557,7 @@ LOADPOS
 		sta INITAD+1
 
 		ldx POS
-		lda table,X
+		lda table0,X
 		and #7
 		cmp	#0
 		beq	LOADXEX
@@ -583,7 +578,7 @@ LOADCAR
 
 		
 LOADXEX		ldx	POS
-		lda	table,X
+		lda	table0,X
 		and	#$70
 		beq	READRAWXEX
 		cmp	#$20
@@ -846,11 +841,11 @@ CRUNPART
 ; Set Source by POSx4 value
 SETPOSSRC
 		ldx POS
-		lda table+1,X	; BANK ->A
+		lda table1,X	; BANK ->A
 		sta BANK
-		lda table+2,X	; MSB ->Y
+		lda table2,X	; MSB ->Y
 		sta SRC+1
-		lda table+3,X	; LSB ->X
+		lda table3,X	; LSB ->X
 		sta SRC
 		rts
 
@@ -874,13 +869,13 @@ IncSrc	inc SRC
 @
 		; Cmp Source
 		ldx POS
-		lda table+3+4,X
+		lda table3+4,X
 		cmp SRC
 		bne @+
-		lda table+2+4,X
+		lda table2+4,X
 		cmp SRC+1
 		bne @+
-		lda table+1+4,X
+		lda table1+4,X
 		cmp BANK
 		bne @+
 		sec
@@ -971,7 +966,7 @@ DISCART sta $D5FF
 CONTIN	rts		
 ;-----------------------------------------------------------------------		
 ; Keyboard Table
-;		A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
+;		     A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
 KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,$2F,$28,$3E,$2D,$0B,$10,$2E,$16,$2B,$17
 ;-----------------------------------------------------------------------
 		icl "apldecr_zp.asm"
