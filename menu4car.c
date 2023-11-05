@@ -582,6 +582,11 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 	};
 };
 /*--------------------------------------------------------------------*/
+#define TYPE_CAR	1
+#define TYPE_BIN	2
+#define	TYPE_XEX	3
+#define TYPE_UNKNOWN	0
+
 U8 saveCAR(const char *filename, U8 *data, unsigned int carsize)
 {
 	U8 header[16]={0x43, 0x41, 0x52, 0x54, 0x00, 0x00, 0x00, 0x2A,
@@ -590,10 +595,16 @@ U8 saveCAR(const char *filename, U8 *data, unsigned int carsize)
 	if (filename==NULL)
 		fprintf(stderr,"Warning: -o not provided, no output generated.\n");
 
+	int output_type=TYPE_UNKNOWN;
+
+	if (strcmp(&filename[strlen(filename)-4],".car")==0) output_type=TYPE_CAR;
+	if (strcmp(&filename[strlen(filename)-4],".bin")==0) output_type=TYPE_BIN;
+	if (strcmp(&filename[strlen(filename)-4],".xex")==0) output_type=TYPE_XEX;
+
 	U8 ret=0;
 	unsigned int i,j,sum=0;
 	FILE *pf;
-	if (!do_bin_output) {
+	if (output_type==TYPE_CAR) {
 		for (i=0; i<carsize; i++) { sum+=data[i];};
 		header[8]=((sum>>24)&0xFF);
 		header[9]=((sum>>16)&0xFF);
@@ -602,17 +613,28 @@ U8 saveCAR(const char *filename, U8 *data, unsigned int carsize)
 		if (be_verbose)
 			printf("Cartridge CRC Checksum: %02x%02x%02x%02x\n",header[8],header[9],header[10],header[11]);
 	}
+
+	if (output_type==TYPE_UNKNOWN) {
+		fprintf(stderr,"Error: -o provided filename has unknown extension (possible are .car, .bin and .xex). No output generated.\n");
+		return 0;
+	}
+
+	if (output_type==TYPE_XEX) {
+		fprintf(stderr,"Error: XEX write not implemented yet. No output generated.\n");
+		return 0;
+	}
+
 	pf=fopen(filename,"wb");
 	if (pf)
 	{
 		j=0;
-		if (!do_bin_output) {
+		if (output_type==TYPE_CAR) {
 			j=fwrite(header,sizeof(U8),16,pf);
 			if (j!=16)
 				fprintf(stderr,"Error: Cartridge image '%s' truncated (%d bytes written)\n",filename, j);
 		}
 
-		if (j==16 || do_bin_output )
+		if (j==16 || output_type==TYPE_CAR || output_type==TYPE_BIN )
 		{
 			i=fwrite(data,sizeof(U8),carsize,pf);
 			if (i==carsize) {
@@ -710,8 +732,7 @@ void usage() {
 		printf("\nOptions:\n");
 		printf("	-p <path> - picdata path (default Menu4Car, built in)\n");
 		printf("	-t <path> - color table path (default rainbow, built in)\n");
-		printf("	-o <path> - outputcar path\n");
-		printf("	-b <path> - output binary image path\n");
+		printf("	-o <path> - outputcar path (filetype: <>.car, <>.bin or <>.exe\n");
 		printf("	-c <compression> - forced compression method 0/1/2/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
 		printf("	-f <path> - font path\n");
 		printf("	-s <size> - cart size: 32/64/128/256/512/1024, default 1024\n");
@@ -756,13 +777,10 @@ int main( int argc, char* argv[] )
 						else
 							usage();
 						break;
-					case 'b':
-						if (has_val)
-							do_bin_output=1;
-						// skipped break
 					case 'o':
-						if (has_val)
+						if (has_val) {
 							outfile=argv[++i];
+						}
 						else
 							usage();
 						break;
