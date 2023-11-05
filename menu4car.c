@@ -308,7 +308,7 @@ void process_types(const char * path, int * flags) {
 void process_inline_params(const char * addparams) {
 	int i=0;
 	// default values
-	do_compress=-1;
+	do_compress=default_do_compress;
 
 	while (i<strlen(addparams))
 	{
@@ -691,8 +691,8 @@ void usage() {
 		printf("(c) GienekP\n\n");
 		printf("usage:\nmenu4car menu.txt <options>\n");
 		printf("\nOptions:\n");
-		printf("	-p <path> - picdata path\n");
-		printf("	-t <path> - colTable path\n");
+		printf("	-p <path> - picdata path (default Menu4Car, built in)\n");
+		printf("	-t <path> - color table path (default rainbow, built in)\n");
 		printf("	-o <path> - outputcar path\n");
 		printf("	-b <path> - output binary image path\n");
 		printf("	-c <compression> - forced compression method 0/1/2/a, (default 'a'uto) like in lines, in lines have priority over this)\n");

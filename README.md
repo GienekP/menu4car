@@ -18,9 +18,20 @@ For now maximum 26 games may be added. Sometimes some game does not work with co
 
 When file .txt is ready, invoke:
 
-   ./menu4car menu4car.txt outcartimage.car
+   ./menu4car menu4car.txt -o outcartimage.car
 
 Then outcartimage.car is a cart image MAXFLASH (type 42) compatible.
+
+Full list of parameteres:
+
+    ./menu4car
+
+or
+
+    ./menu4car -?
+
+If a parameter is specified more than once, the last is active.
+
 
 ## Build the executables:
 
