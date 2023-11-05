@@ -22,6 +22,7 @@ typedef unsigned char U8;
 #define NAMELEN (0x30)
 #define PARAMSLEN (8)
 #define DELIM	('|')
+#define MAX_ENTRIES	26
 /*--------------------------------------------------------------------*/
 #include "menu4car.h"
 #include "apultra/src/libapultra.h"
@@ -30,6 +31,7 @@ int do_compress=1;
 int be_verbose=0;
 int errornumbers=0;
 int do_bin_output=0;
+int default_do_compress=-1;
 /*--------------------------------------------------------------------*/
 U8 ATASCII2Internal(U8 a)
 {
@@ -539,7 +541,7 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 	if (pf)
 	{
 		i=0;
-		while (i<26)
+		while (i<MAX_ENTRIES)
 		{
 			U8 status=readLine(pf,name,path,addparams);
 			if (strlen(path)>0 && strlen(name)>0) {
@@ -554,7 +556,7 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 				break;
 		};
 		addPos(0,carsize,0,0,0,0);
-		for (i=0; i<27; i++)
+		for (i=0; i<MAX_ENTRIES+1; i++)
 		{
 			if (data[4*i]!=0xFF) {data[4*i+2]+=0xA0;};
 		};
