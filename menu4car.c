@@ -7,7 +7,9 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include <sysexits.h>
 #include <sys/param.h>
+#include <errno.h>
 
 #include "libapultra.h"
 /*--------------------------------------------------------------------*/
@@ -25,6 +27,9 @@ typedef unsigned char U8;
 #include "apultra/src/libapultra.h"
 /*--------------------------------------------------------------------*/
 int do_compress=1;
+int be_verbose=0;
+int errornumbers=0;
+int do_bin_output=0;
 /*--------------------------------------------------------------------*/
 U8 ATASCII2Internal(U8 a)
 {
@@ -156,12 +161,14 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 		fillATASCII(&data[32*4+16*32+32*pos+6],(U8 *)name,24);
 	};
 
-	printf("Adding at: $%06x: file \"%s\", length %d bytes... ",start,name,size);
+	if (be_verbose)
+		printf("Adding at: $%06x: file \"%s\", length %d bytes... ",start,name,size);
 	return ret;
 }
 /*--------------------------------------------------------------------*/
 unsigned int loadFile(const char *path, U8 *buf, unsigned int sizebuf)
 {
+	if (path==NULL) return 0;
 	unsigned int size=0;
 	FILE *pf;
 	pf=fopen(path,"rb");
@@ -172,7 +179,8 @@ unsigned int loadFile(const char *path, U8 *buf, unsigned int sizebuf)
 	}
 	else
 	{
-		printf("Load Error \"%s\".\n",path);
+		fprintf(stderr,"Load Error \"%s\".\n",path);
+		errornumbers++;
 	};
 	return size;
 }
@@ -296,9 +304,8 @@ void process_types(const char * path, int * flags) {
 	// nagl CART type 8kb || ext bin || ext car- CART
 	// nagl BASIC? - ext BAS
 }
-
 /*--------------------------------------------------------------------*/
-void process_params(const char * addparams) {
+void process_inline_params(const char * addparams) {
 	int i=0;
 	// default values
 	do_compress=-1;
@@ -317,10 +324,10 @@ void process_params(const char * addparams) {
 					do_compress=addparams[i]-'0';
 					break;
 				case 0:
-					printf("Error: truncated option c.\n");
+					fprintf(stderr,"Error: truncated option c.\n");
 					break;
 				default:
-					printf("Error: option c%c.\n",addparams[i]);
+					fprintf(stderr,"Error: option c%c.\n",addparams[i]);
 					break;
 			}
 		}
@@ -339,21 +346,28 @@ static unsigned int pos=0;
 	int flags=0;
 
 	if (data==NULL) {
-		printf("Summary size taken by binaries: %d/0x%0x\n",osize,osize);
-		//if (do_compress) {
-			printf("not compressed size: %d/0x%0x\n",ncsize,ncsize);
+		if (be_verbose) {
+			printf("SUMMARY:\n");
+			printf("Processed %d file entries.\n",pos);
+			printf("Spotted %d errors.\n",errornumbers);
+			//if (do_compress) {
+			printf("Cartridge size: %d/%06x\n",carsize,carsize);
+			printf("Cartridge data section size: %d/%06x\n",carsize-BANKSIZE,carsize-BANKSIZE);
+			printf("Overall file size before compressed: %d/0x%06x\n",ncsize,ncsize);
+			printf("Summary size taken by binaries: %d/0x%06x\n",osize,osize);
 			printf("Compression ratio: %d%%\n",osize*100/ncsize);
-		//}
-		printf("Cartridge fill: %d%%\n",((osize+1)*200)/(2*(FLASHMAX-8192)));
+			//}
+			printf("Cartridge fill: %d%%\n",((osize+1)*200)/(2*(carsize-BANKSIZE)));
+		}
 		return 0;
 	}
 
-	process_params(addparams);
+	process_inline_params(addparams);
 	process_types(path,&flags);
 
 	if (status)
 	{
-		unsigned int size=loadFile(path,buf,sizeof(buf)-8192-6);
+		unsigned int size=loadFile(path,buf,sizeof(buf)-BANKSIZE-6);
 		size=repairFile(buf,size);
 		// compress file, get new size.
 		/**
@@ -408,10 +422,12 @@ static unsigned int pos=0;
 				unsigned int over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags);
 				advance=1;
 				if (over) {
-					printf("skipped: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
+					if (be_verbose)
+						printf("skipped: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
 				}
 				else {
-					printf("compressed: \"%s\", method %d, length (compr/uncompr): %d/%d, ratio %d%%\n",name,choosen_compress_method,comprsize,size,comprsize*100/size);
+					if (be_verbose)
+						printf("compressed: \"%s\", method %d, length (compr/uncompr): %d/%d, ratio %d%%\n",name,choosen_compress_method,comprsize,size,comprsize*100/size);
 					osize+=comprsize;
 					ncsize+=size;
 				}
@@ -423,10 +439,12 @@ static unsigned int pos=0;
 				unsigned int over=insertPos(name,data,carsize,pos,buf,size,flags);
 				advance=1;
 				if (over) {
-					printf("skipped: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
+					if (be_verbose)
+						printf("skipped: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
 				}
 				else	{
-					printf("added.\n");
+					if (be_verbose)
+						printf("added without compression.\n");
 					osize+=size;
 					ncsize+=size;
 				}
@@ -524,16 +542,18 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 		while (i<26)
 		{
 			U8 status=readLine(pf,name,path,addparams);
-			if (name[0]=='#') continue;
 			if (strlen(path)>0 && strlen(name)>0) {
-				printf("Line read:'%s','%s','%s'\n",name,path,addparams);
+				if (be_verbose)
+					printf("Line read:'%s','%s','%s'\n",name,path,addparams);
+				if (name[0]=='#')
+					continue;
 				addPos(data,carsize,name,path,addparams,status);
 				i++;
 			}
 			else
 				break;
 		};
-		addPos(0,0,0,0,0,0);
+		addPos(0,carsize,0,0,0,0);
 		for (i=0; i<27; i++)
 		{
 			if (data[4*i]!=0xFF) {data[4*i+2]+=0xA0;};
@@ -542,7 +562,7 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 	}
 	else
 	{
-		printf("Open Error \"%s\".\n",filemenu);
+		fprintf(stderr,"Open Error \"%s\".\n",filemenu);
 	};
 };
 /*--------------------------------------------------------------------*/
@@ -550,25 +570,54 @@ U8 saveCAR(const char *filename, U8 *data, unsigned int carsize)
 {
 	U8 header[16]={0x43, 0x41, 0x52, 0x54, 0x00, 0x00, 0x00, 0x2A,
 		           0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00};
+
+	if (filename==NULL)
+		fprintf(stderr,"Warning: -o not provided, no output generated.\n");
+
 	U8 ret=0;
-	unsigned int i,sum=0;
+	unsigned int i,j,sum=0;
 	FILE *pf;
-	for (i=0; i<carsize; i++) {sum+=data[i];};
-	header[8]=((sum>>24)&0xFF);
-	header[9]=((sum>>16)&0xFF);
-	header[10]=((sum>>8)&0xFF);
-	header[11]=(sum&0xFF);
+	if (!do_bin_output) {
+		for (i=0; i<carsize; i++) { sum+=data[i];};
+		header[8]=((sum>>24)&0xFF);
+		header[9]=((sum>>16)&0xFF);
+		header[10]=((sum>>8)&0xFF);
+		header[11]=(sum&0xFF);
+		if (be_verbose)
+			printf("Cartridge CRC Checksum: %02x%02x%02x%02x\n",header[8],header[9],header[10],header[11]);
+	}
 	pf=fopen(filename,"wb");
 	if (pf)
 	{
-		i=fwrite(header,sizeof(U8),16,pf);
-		if (i==16)
+		j=0;
+		if (!do_bin_output) {
+			j=fwrite(header,sizeof(U8),16,pf);
+			if (j!=16)
+				fprintf(stderr,"Error: Cartridge image '%s' truncated (%d bytes written)\n",filename, j);
+		}
+
+		if (j==16 || do_bin_output )
 		{
 			i=fwrite(data,sizeof(U8),carsize,pf);
-			if (i==carsize) {ret=1;};			
+			if (i==carsize) {
+				if (be_verbose)
+					printf("Cartridge image '%s' saved (%d bytes)\n",filename, i+j);
+				ret=1;
+				}
+			else
+			{
+				fprintf(stderr,"Error: Cartridge image '%s' truncated (%d bytes written)\n",filename, i+j);
+
+			}
+
 		};
 		fclose(pf);
-	};
+	}
+	else {
+		fprintf(stderr,"Error opening file '%s': %s \n",filename, strerror(errno));
+		fprintf(stderr,"Cartridge image file write failed.\n");
+	}
+
 	return ret;
 }
 /*--------------------------------------------------------------------*/
@@ -576,6 +625,7 @@ void addMenu(U8 *cardata, unsigned int size,
              U8 *loader, unsigned int loadersize, unsigned int offset)
 {
 	unsigned int i,j;
+	// fill bootstrap on every empty block
 	for (j=0; j<(size/BANKSIZE); j++)
 	{
 		for (i=0; i<offset; i++) {cardata[(j+1)*BANKSIZE-offset+i]=loader[loadersize-offset+i];};
@@ -615,33 +665,161 @@ void fillData(U8 *cardata, unsigned int size, U8 byte)
 	for (i=0; i<size; i++) {cardata[i]=byte;};
 }
 /*--------------------------------------------------------------------*/
-void menu4car(const char *filemenu, const char *logo, const char *carname)
+void addFont(U8 * cardata, const char * fontpath)
+{
+	loadFile(fontpath,&cardata[0x800],1024);
+}
+/*--------------------------------------------------------------------*/
+void addCTable(U8 * cardata, const char * colortablefile)
+{
+	loadFile(colortablefile,&cardata[0x7F0],16);
+}
+/*--------------------------------------------------------------------*/
+void menu4car(const char * filemenu, const char * logo, const char * colortablefile, const char * fontpath, const char * carname, int cart_size, int default_do_compress)
 {
 	U8 cardata[CARMAX];
 	fillData(cardata, CARMAX, 0xFF);
 	addMenu(cardata,CARMAX,menu4car_bin,menu4car_bin_len,19);
 	addLogo(cardata,logo,256*16,8);
-	addData(cardata,FLASHMAX,filemenu);
-	saveCAR(carname,cardata,CARMAX);
+	addCTable(cardata,colortablefile);
+	addFont(cardata,fontpath);
+	addData(cardata,cart_size,filemenu);
+	saveCAR(carname,cardata,cart_size);
+}
+void usage() {
+		printf("Menu4CAR - ver: %s\n",__DATE__);
+		printf("(c) GienekP\n\n");
+		printf("usage:\nmenu4car menu.txt <options>\n");
+		printf("\nOptions:\n");
+		printf("	-p <path> - picdata path\n");
+		printf("	-t <path> - colTable path\n");
+		printf("	-o <path> - outputcar path\n");
+		printf("	-b <path> - output binary image path\n");
+		printf("	-c <compression> - forced compression method 0/1/2/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
+		printf("	-f <path> - font path\n");
+		printf("	-s <size> - cart size: 32/64/128/256/512/1024, default 1024\n");
+		printf("	-v - be verbose\n");
+		printf("	-? - this help\n\n");
+		exit(EX_USAGE);
 }
 /*--------------------------------------------------------------------*/
 int main( int argc, char* argv[] )
 {	
-	printf("Menu4CAR - ver: %s\n",__DATE__);
-	if (argc==3)
+	if (argc<=1)
 	{
-		menu4car(argv[1],NULL,argv[2]);
-	} else
-	if (argc==4)
-	{
-		menu4car(argv[1],argv[2],argv[3]);
-	}
-	else
-	{
-		printf("(c) GienekP\n");
-		printf("use:\nmenu4car menu.txt file.car\n");
+		usage();
 	};
-	printf("\n");
+
+	char * logofilepath=NULL;
+	char * colortablefile=NULL;
+	char * outfile=NULL;
+	char * fontpath=NULL;
+	int  cart_size=1024*1024;
+	int default_do_compress=-1;
+	char * txtfilename=NULL;
+	int i;
+
+	i=1;
+	while (i<argc)
+	{
+		if (argv[i][0]=='-') {
+			if  (strlen(argv[i])==2) {
+				int has_val=i<(argc-1);
+				//printf("arg: %c\n",argv[i][1]);
+				switch (argv[i][1]) {
+					case 'p':
+						if (has_val)
+							logofilepath=argv[++i];
+						else
+							usage();
+						break;
+					case 't':
+						if (has_val)
+							colortablefile=argv[++i];
+						else
+							usage();
+						break;
+					case 'b':
+						if (has_val)
+							do_bin_output=1;
+						// skipped break
+					case 'o':
+						if (has_val)
+							outfile=argv[++i];
+						else
+							usage();
+						break;
+					case 'c':
+						if (has_val) {
+							i++;
+							if (strlen(argv[i])==1) {
+								switch (argv[i][0]) {
+									case 'a':
+										default_do_compress=-1;
+										break;
+									case '0':
+									case '1':
+									case '2':
+										default_do_compress=argv[i][0]-'0';
+										break;
+									default:
+										usage();
+								}
+							}
+						} else usage();
+
+						break;
+					case 'f':
+						if (has_val)
+							fontpath=argv[++i];
+						else
+							usage();
+
+						//printf("Font path: %s\n",fontpath);
+
+						break;
+					case 's':
+						if (has_val) {
+							int s;
+							i++;
+							int tab[]={32,64,128,256,512,1024};
+							for (s=0; s<6; s++){
+								char test[10];
+								sprintf(test,"%d",tab[s]);
+
+								if (strcmp(test,argv[i])==0) {
+									cart_size=strtol(argv[i],NULL,10)*1024;
+									//printf("Cart size: %d\n",cart_size);
+									break;
+								}
+							}
+							if (s==6) usage();
+						}
+						else
+							usage();
+						break;
+
+					case 'v': 
+						be_verbose=1;
+						break;
+					default:
+						usage();
+						break;
+				}
+			} else
+				usage();
+
+		}
+		else
+			txtfilename=argv[i];
+		i++;
+	}
+
+	if (txtfilename)
+		menu4car(txtfilename,logofilepath, colortablefile, fontpath, outfile, cart_size, default_do_compress);
+	if (errornumbers>0)
+		fprintf(stderr,"Warning: %d input file errors encountered.\n",errornumbers);
+
 	return 0;
 }
 /*--------------------------------------------------------------------*/
