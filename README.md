@@ -35,7 +35,7 @@ If a parameter is specified more than once, the last is active.
 
 ## Build the executables:
 
-To get new repo, type in terminal:
+To get the code, type in terminal:
 
     git clone https://github.com/GienekP/menu4car.git
 

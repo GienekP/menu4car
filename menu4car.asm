@@ -336,8 +336,8 @@ BEGIN	jsr TESTSEL
 		bpl @-
 		;--------
 		; RUN if only one pos
-		stx CNT
-		sta POS
+		stx CNT	; store counted entries
+		sta POS ; just in case if one pos
 		dex
 		beq RESTORE
 		lda #$0
@@ -380,7 +380,7 @@ RANDOPT	lda RANDOM
 		bcc RESTORE
 FINDKEY	dex
 		cpx CNT
-		bcs RANDOPT
+		bcs RANDOPT ; random if bigger than SNT
 		stx POS
 
 		;--------	
@@ -674,6 +674,7 @@ RUNPART	lda BANK
 		sta RUN
 		lda INITAD+1
 		sta RUN+1		; Copy INITAD
+
 		sei
 		lda #$00
 		sta CRITIC
@@ -916,14 +917,14 @@ CopyCLR	ldx #(CLPRE-CLPRS-1)
 		sta $0400,X
 		dex
 		bpl @-
-		lda #0	; na cart
-		ldy #$1
+		lda #0
+		ldy #1
 		sty CRITIC
 		tay
 		jsr $0400	
-		ldy TRIG3	; na cart
-		sty GINTLK	; na cart
-		sta CRITIC	; na cart
+		ldy TRIG3
+		sty GINTLK
+		sta CRITIC
 		ldx #(CLPRE-CLPRS-1)
 @		lda #$00
 		sta $0400,X
