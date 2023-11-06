@@ -15,7 +15,7 @@ $(MAIN).h : $(MAIN).bin
 	xxd -i -c 16 "$<" "$@"
 
 $(MAIN).bin : $(MAIN).asm apldecr_zp.asm
-	mads "$<" -t -o:"$@"
+	mads "$<" -t -o:"$@" | sed "s/\\$$//g"
 
 libapultra.a:
 	$(MAKE) -C apultra libapultra.a

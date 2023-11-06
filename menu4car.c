@@ -25,6 +25,7 @@ typedef unsigned char U8;
 #define MAX_ENTRIES	104
 #define MAX_ENTRIES_1	(MAX_ENTRIES+1)
 
+// provided from .asm mads compile
 #define         SCREENDATA_OFFSET	0x0000
 #define         DATAARRAY_OFFSET	0x0C20
 #define         COLORTABLE_OFFSET	0x0DD4
@@ -115,23 +116,6 @@ void fillATASCII(U8 *txt, const U8 *name, unsigned int limit)
 	};
 }
 /*--------------------------------------------------------------------*/
-unsigned int clearPos(U8 *data, unsigned int pos)
-{
-	int SC_POS_OFFSET=SCREENDATA_OFFSET+32*pos;
-	int DA_POS_OFFSET=DATAARRAY_OFFSET+pos;
-	unsigned int k=(SC_POS_OFFSET);
-	// zeroify letter and dot
-	data[k+3]=0;
-	data[k+4]=0;
-	// 
-	data[DA_POS_OFFSET]|=0x80;
-	data[DA_POS_OFFSET+1+0*MAX_ENTRIES_1]=data[DA_POS_OFFSET+0*MAX_ENTRIES_1];
-	data[DA_POS_OFFSET+1+1*MAX_ENTRIES_1]=data[DA_POS_OFFSET+1*MAX_ENTRIES_1];
-	data[DA_POS_OFFSET+1+2*MAX_ENTRIES_1]=data[DA_POS_OFFSET+2*MAX_ENTRIES_1];
-	data[DA_POS_OFFSET+1+3*MAX_ENTRIES_1]=data[DA_POS_OFFSET+3*MAX_ENTRIES_1];
-	return (pos+1);
-}
-/*--------------------------------------------------------------------*/
 unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigned int pos,
 					const U8 *buf, unsigned int size,int flags)
 {
@@ -140,32 +124,23 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 	int SC_POS_OFFSET=SCREENDATA_OFFSET+32*pos;
 	int DA_POS_OFFSET=DATAARRAY_OFFSET+pos;
 	if (pos==0) 
-	{
-		start=BANKSIZE; // first adr in first bank
-		stop=BANKSIZE+size;
-		data[DA_POS_OFFSET+0*MAX_ENTRIES_1]=flags; // flags
+	{	// init first entry as end marker
+		data[DA_POS_OFFSET+0*MAX_ENTRIES_1]=0x80; // flags
 		data[DA_POS_OFFSET+1*MAX_ENTRIES_1]=1; // bank
 		data[DA_POS_OFFSET+2*MAX_ENTRIES_1]=0; // abs adr in bank hi (A000-based)
 		data[DA_POS_OFFSET+3*MAX_ENTRIES_1]=0; // abs adr in bank lo (A000-based)
 	}
-	else
-	{
-		unsigned int bank=data[DA_POS_OFFSET+1*MAX_ENTRIES_1];
-		unsigned int ah  =data[DA_POS_OFFSET+2*MAX_ENTRIES_1];
-		unsigned int al  =data[DA_POS_OFFSET+3*MAX_ENTRIES_1];
-		start=(((bank)*BANKSIZE)|(((ah<<8)|al)&0x1FFF));
-		data[DA_POS_OFFSET]=flags&0x7f; // overwrite with current
-	};
+		
+	unsigned int bank=data[DA_POS_OFFSET+1*MAX_ENTRIES_1];
+	unsigned int ah  =data[DA_POS_OFFSET+2*MAX_ENTRIES_1];
+	unsigned int al  =data[DA_POS_OFFSET+3*MAX_ENTRIES_1];
+	start=(((bank)*BANKSIZE)|(((ah<<8)|al)&0x1FFF));
 	stop=(start+size);
-	if (stop>carsize) 
-	{
-		clearPos(data,pos);
-		ret=stop-carsize;
-		stop=start;
-	}
-	else
-	{
+	if (stop<=carsize) {// if fits
+		data[DA_POS_OFFSET]=flags&0x7f; // overwrite with current
+
 		for (i=0; i<size; i++) {data[start+i]=buf[i];};
+
 		data[DA_POS_OFFSET+1+0*MAX_ENTRIES_1]=0x80; // mark as last in advance.
 		data[DA_POS_OFFSET+1+1*MAX_ENTRIES_1]=((stop/BANKSIZE)&0x7F);
 		data[DA_POS_OFFSET+1+2*MAX_ENTRIES_1]=((stop>>8)&0x1F);
@@ -174,7 +149,12 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 		data[SC_POS_OFFSET+3]='A'+pos-0x20;
 		data[SC_POS_OFFSET+4]='.'-0x20;
 		fillATASCII(&data[SC_POS_OFFSET+6],(U8 *)name,24);
-	};
+	}
+	else
+	{
+		ret=stop-carsize;
+		stop=start;
+	}
 
 	if (be_verbose)
 		printf("Adding at: $%06x: file \"%s\", length %d bytes... ",start,name,size);
@@ -191,11 +171,18 @@ unsigned int insertCartPos(const char *name, U8 *data, unsigned int carsize, uns
 	if (pos==0) 
 	{
 		start=BANKSIZE;
-		stop=0;
-		data[DA_POS_OFFSET+0*MAX_ENTRIES_1]=flags; // flags
-		data[DA_POS_OFFSET+1*MAX_ENTRIES_1]=1; // bank
-		data[DA_POS_OFFSET+2*MAX_ENTRIES_1]=0; // abs adr in bank hi (A000-based)
-		data[DA_POS_OFFSET+3*MAX_ENTRIES_1]=0; // abs adr in bank lo (A000-based)
+		stop=(start+size);
+		if (stop<=carsize) {
+			data[DA_POS_OFFSET+0*MAX_ENTRIES_1]=flags; // flags
+			data[DA_POS_OFFSET+1*MAX_ENTRIES_1]=1; // bank
+			data[DA_POS_OFFSET+2*MAX_ENTRIES_1]=0; // abs adr in bank hi (A000-based)
+			data[DA_POS_OFFSET+3*MAX_ENTRIES_1]=0; // abs adr in bank lo (A000-based)
+		}
+		else 
+		{
+			ret = stop-carsize;
+			stop=start;
+		}
 	}
 	else
 	{
@@ -203,30 +190,25 @@ unsigned int insertCartPos(const char *name, U8 *data, unsigned int carsize, uns
 		unsigned int ah  =data[DA_POS_OFFSET+2*MAX_ENTRIES_1];
 		unsigned int al  =data[DA_POS_OFFSET+3*MAX_ENTRIES_1];
 		start=(((bank)*BANKSIZE)|(((ah<<8)|al)&0x1FFF));
-		data[DA_POS_OFFSET]=flags&0x7f; // overwrite with current
-	};
+		stop=(start+size);
+		if (stop<=carsize) {
+			data[DA_POS_OFFSET]=flags&0x7f; // overwrite with current
+			for (i=0; i<size; i++) {data[start+i]=buf[i];};
+			data[DA_POS_OFFSET+1+0*MAX_ENTRIES_1]=0x80; // mark as last in advance.
+			data[DA_POS_OFFSET+1+1*MAX_ENTRIES_1]=((stop/BANKSIZE)&0x7F);
+			data[DA_POS_OFFSET+1+2*MAX_ENTRIES_1]=((stop>>8)&0x1F);
+			data[DA_POS_OFFSET+1+3*MAX_ENTRIES_1]=(stop&0xFF);
 
-	stop=(start+size);
-	if (stop>carsize) 
-	{
-		clearPos(data,pos);
+			data[SC_POS_OFFSET+3]='A'+pos-0x20;
+			data[SC_POS_OFFSET+4]='.'-0x20;
+			fillATASCII(&data[SC_POS_OFFSET+6],(U8 *)name,24);
+		}
+		else
+		{
 		ret=stop-carsize;
 		stop=start;
-	}
-	else
-	{
-		for (i=0; i<size; i++) {data[start+i]=buf[i];};
-
-		data[DA_POS_OFFSET+1+0*MAX_ENTRIES_1]=0x80; // mark as last in advance.
-		data[DA_POS_OFFSET+1+1*MAX_ENTRIES_1]=((stop/BANKSIZE)&0x7F);
-		data[DA_POS_OFFSET+1+2*MAX_ENTRIES_1]=((stop>>8)&0x1F);
-		data[DA_POS_OFFSET+1+3*MAX_ENTRIES_1]=(stop&0xFF);
-
-
-		data[SC_POS_OFFSET+3]='A'+pos-0x20;
-		data[SC_POS_OFFSET+4]='.'-0x20;
-		fillATASCII(&data[SC_POS_OFFSET+6],(U8 *)name,24);
-	}
+		}
+	};
 
 	if (be_verbose)
 		printf("Adding at: $%06x: file \"%s\", length %d bytes... ",start,name,size);
@@ -551,15 +533,15 @@ static unsigned int pos=0;
 						ncsize+=size;
 					}
 				}
-				else
-				{clearPos(data,pos);};
+				//else
+				//{clearPos(data,pos);};
 			}
 		}
 		else if (filetype==TYPE_CAR)
 		{
 			if (size==0x2010)
 			{
-				unsigned int over=insertCartPos(name,data,carsize,pos,&buf[16],0x2000,flags);
+				unsigned int over=insertPos(name,data,carsize,pos,&buf[16],0x2000,flags);
 				osize+=size&0xf800;
 				ncsize+=size&0xf800;
 				advance=1;
@@ -568,7 +550,7 @@ static unsigned int pos=0;
 	}
 	else
 	{
-		clearPos(data,pos);
+		//clearPos(data,pos);
 	};
 	pos+=advance;
 	return pos;
@@ -704,7 +686,7 @@ U8 saveCAR(const char *filename, U8 *data, unsigned int carsize)
 		header[10]=((sum>>8)&0xFF);
 		header[11]=(sum&0xFF);
 		if (be_verbose)
-			printf("Cartridge CRC Checksum: %02x%02x%02x%02x\n",header[8],header[9],header[10],header[11]);
+			printf("Cartridge Checksum: %02x%02x%02x%02x\n",header[8],header[9],header[10],header[11]);
 	}
 
 	if (output_type==TYPE_UNKNOWN) {
@@ -816,7 +798,7 @@ void menu4car(const char * filemenu, const char * logo, const char * colortablef
 	addCTable(cardata,colortablefile);
 	addFont(cardata,fontpath);
 	addData(cardata,cart_size,filemenu);
-	saveCAR(carname,cardata,cart_size);
+	saveCAR(carname,cardata,FLASHMAX);
 }
 void usage() {
 		printf("Menu4CAR - ver: %s\n",__DATE__);
@@ -846,7 +828,6 @@ int main( int argc, char* argv[] )
 	char * outfile=NULL;
 	char * fontpath=NULL;
 	int  cart_size=1024*1024;
-	int default_do_compress=-1;
 	char * txtfilename=NULL;
 	int i;
 
