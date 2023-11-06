@@ -916,7 +916,14 @@ CopyCLR	ldx #(CLPRE-CLPRS-1)
 		sta $0400,X
 		dex
 		bpl @-
+		lda #0	; na cart
+		ldy #$1
+		sty CRITIC
+		tay
 		jsr $0400	
+		ldy TRIG3	; na cart
+		sty GINTLK	; na cart
+		sta CRITIC	; na cart
 		ldx #(CLPRE-CLPRS-1)
 @		lda #$00
 		sta $0400,X
@@ -974,25 +981,16 @@ KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,
 ;-----------------------------------------------------------------------		
 ; $0400 CODE
 ; CLR $A000 - $BFFF
-CLPRS	lda #$A0
-		sta CRITIC
+CLPRS
 		sta $D5FF
-		sta TMP+1
-		lda #$00
-		sta TMP
-		tay
-NEWPAG	lda #$00
-@		sta (TMP),Y
+@		sta CADR:$a000,y
 		iny
 		bne @-
-		inc TMP+1
-		bit TMP+1
-		bvc NEWPAG
-		sta $D500
-		ldy TRIG3
-		sty GINTLK
-		sta CRITIC
-		rts
+		inc CADR+1
+		bit CADR+1
+		bvc @-
+		sta $D500	
+		rts		
 CLPRE		
 ;-----------------------------------------------------------------------		
 ; STACK CODE FOR NORMAL AND BLOCK COMPRESSED
