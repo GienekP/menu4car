@@ -34,6 +34,7 @@ GETSRCCB = ($0200-(DTA256CPYE-SRCP256))
 RUN     = ($0200-(ENTRYE-ADRRUN)+1)
 BACK    = ($0200-(ENTRYE-ADRBCK)+1)
 ENTRY   = ($0200-(ENTRYE-ENTRYS))
+RUNCART   = ($0200-(RUNCARTE-RUNCARTS))
 
 ;-----------------------------------------------------------------------
 
@@ -376,12 +377,12 @@ RANDOPT	lda RANDOM
 		and #$1F
 		cmp CNT
 		bcs RANDOPT
-		sta POS
+		sta POS	; set random pos
 		bcc RESTORE
 FINDKEY	dex
 		cpx CNT
 		bcs RANDOPT ; random if bigger than SNT
-		stx POS
+		stx POS ; set pos by key pressed
 
 		;--------	
 		; Restore Screen	
@@ -548,7 +549,6 @@ CLICK	lda TMP
 ; Load POS=A
 
 		;--------	
-		; 4 bytes - MUL 4	
 LOADPOS
 		lda #$FF		; Clear RUNAD & INITAD
 		sta RUNAD
@@ -573,9 +573,19 @@ LOADPOS
 LOADBOOT
 LOADATR
 LOADBASIC
-LOADCAR
 		jmp	RESETCD
-
+LOADCAR		; 8 kb car area straight mapping
+		jsr	CopyRunCart
+		ldx	POS
+		lda	table1,X ; bank
+		jmp	RUNCART
+		; RUNCART ram procedure
+		; copies procedure to ram.
+		; In ram:
+		; sets proper cart bank (passed in A)
+		; clears stack and jumps to $e477
+		; this lets the cart to be properly initialized
+		; dos load etc.
 		
 LOADXEX		ldx	POS
 		lda	table0,X
@@ -959,6 +969,14 @@ CopyENT	ldx #(ENTRYE-ENTRYS)
 		bne @-
 		rts
 ;-----------------------------------------------------------------------		
+CopyRunCart	ldx #(RUNCARTE-RUNCARTS)
+@		lda RUNCARTS-1,x
+		sta $0200-(RUNCARTE-RUNCARTS+1),X
+		dex
+		bne @-
+		rts
+
+;-----------------------------------------------------------------------		
 ; Test /Select/ and Disable Cartridge
 TESTSEL	lda CONSOL
 		and #$02
@@ -1052,6 +1070,23 @@ ADRRUN	jsr RESETCD
 		sta $D500
 ADRBCK	jmp EXIT
 ENTRYE
+
+;--------------------------------------------
+; RUNCART ram procedure
+; copies procedure to ram.
+; In ram:
+; sets proper cart bank (passed in A)
+; clears stack and jumps to $e477
+; this lets the cart to be properly initialized
+; dos load etc.
+RUNCARTS
+		tay
+		sta $d500,y
+		lda #0
+		sta COLDST
+		jmp RESETCD
+
+RUNCARTE
 	.print"End of code: ",*
 ;-----------------------------------------------------------------------		
 ; INITCART ROUTINE - back from old MaxFlash

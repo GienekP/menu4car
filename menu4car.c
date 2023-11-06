@@ -181,6 +181,58 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 	return ret;
 }
 /*--------------------------------------------------------------------*/
+unsigned int insertCartPos(const char *name, U8 *data, unsigned int carsize, unsigned int pos,
+					const U8 *buf, unsigned int size,int flags)
+{
+	unsigned int i,ret=0;
+	unsigned int start,stop;
+	int SC_POS_OFFSET=SCREENDATA_OFFSET+32*pos;
+	int DA_POS_OFFSET=DATAARRAY_OFFSET+pos;
+	if (pos==0) 
+	{
+		start=BANKSIZE;
+		stop=0;
+		data[DA_POS_OFFSET+0*MAX_ENTRIES_1]=flags; // flags
+		data[DA_POS_OFFSET+1*MAX_ENTRIES_1]=1; // bank
+		data[DA_POS_OFFSET+2*MAX_ENTRIES_1]=0; // abs adr in bank hi (A000-based)
+		data[DA_POS_OFFSET+3*MAX_ENTRIES_1]=0; // abs adr in bank lo (A000-based)
+	}
+	else
+	{
+		unsigned int bank=data[DA_POS_OFFSET+1*MAX_ENTRIES_1];
+		unsigned int ah  =data[DA_POS_OFFSET+2*MAX_ENTRIES_1];
+		unsigned int al  =data[DA_POS_OFFSET+3*MAX_ENTRIES_1];
+		start=(((bank)*BANKSIZE)|(((ah<<8)|al)&0x1FFF));
+		data[DA_POS_OFFSET]=flags&0x7f; // overwrite with current
+	};
+
+	stop=(start+size);
+	if (stop>carsize) 
+	{
+		clearPos(data,pos);
+		ret=stop-carsize;
+		stop=start;
+	}
+	else
+	{
+		for (i=0; i<size; i++) {data[start+i]=buf[i];};
+
+		data[DA_POS_OFFSET+1+0*MAX_ENTRIES_1]=0x80; // mark as last in advance.
+		data[DA_POS_OFFSET+1+1*MAX_ENTRIES_1]=((stop/BANKSIZE)&0x7F);
+		data[DA_POS_OFFSET+1+2*MAX_ENTRIES_1]=((stop>>8)&0x1F);
+		data[DA_POS_OFFSET+1+3*MAX_ENTRIES_1]=(stop&0xFF);
+
+
+		data[SC_POS_OFFSET+3]='A'+pos-0x20;
+		data[SC_POS_OFFSET+4]='.'-0x20;
+		fillATASCII(&data[SC_POS_OFFSET+6],(U8 *)name,24);
+	}
+
+	if (be_verbose)
+		printf("Adding at: $%06x: file \"%s\", length %d bytes... ",start,name,size);
+	return ret;
+}
+/*--------------------------------------------------------------------*/
 unsigned int loadFile(const char *path, U8 *buf, unsigned int sizebuf)
 {
 	if (path==NULL) return 0;
@@ -313,11 +365,43 @@ unsigned int compressAPLBlockByBlock(U8 *bufin, unsigned int retsize, U8 * bufou
 	return retsize;
 }
 /*--------------------------------------------------------------------*/
-void process_types(const char * path, int * flags) {
-	// FFFF xex
-	// nagl ATR || ext atr - ATR
-	// nagl CART type 8kb || ext bin || ext car- CART
-	// nagl BASIC? - ext BAS
+// those types correspond to .asm file
+#define	TYPE_XEX	0
+#define	TYPE_BOOT	1
+#define	TYPE_ATR	2
+#define TYPE_BAS	3
+#define TYPE_CAR	4
+// this is for another use, for output without car header
+#define TYPE_BIN	20
+#define TYPE_UNKNOWN	-1
+
+int checkTypeByPath(const char * filename) {
+#define TSTEXT(f,a) strcasecmp(&(f)[strlen(f)-4],(a))==0
+
+	if (TSTEXT(filename,".car")) return TYPE_CAR;
+	if (TSTEXT(filename,".bin")) return TYPE_BIN;
+	if (TSTEXT(filename,".bas")) return TYPE_BAS;
+	if (TSTEXT(filename,".xex")) return TYPE_XEX;
+	if (TSTEXT(filename,".exe")) return TYPE_XEX;
+	if (TSTEXT(filename,".obx")) return TYPE_XEX;
+	if (TSTEXT(filename,".com")) return TYPE_XEX;
+	if (TSTEXT(filename,".atr")) return TYPE_ATR;
+	if (TSTEXT(filename,".bot")) return TYPE_BOOT;
+	return TYPE_UNKNOWN;
+}
+
+
+/*--------------------------------------------------------------------*/
+void process_input_types(const char * path, int * flags) {
+/*
+		0->	LOADXEX
+		1->	LOADBOOT
+		2->	LOADATR
+		3->	LOADBASIC
+		4->	LOADCAR
+*/
+	*flags=checkTypeByPath(path);
+	if (*flags>=20) *flags=TYPE_UNKNOWN;
 }
 /*--------------------------------------------------------------------*/
 void process_inline_params(const char * addparams) {
@@ -378,97 +462,114 @@ static unsigned int pos=0;
 	}
 
 	process_inline_params(addparams);
-	process_types(path,&flags);
+	process_input_types(path,&flags);
 
 	if (status)
 	{
 		unsigned int size=loadFile(path,buf,sizeof(buf)-BANKSIZE-6);
-		size=repairFile(buf,size);
-		// compress file, get new size.
-		/**
- * Compress memory
- *
- * @param pInputData pointer to input(source) data to compress
- * @param pOutBuffer buffer for compressed data
- * @param nInputSize input(source) size in bytes
- * @param nMaxOutBufferSize maximum capacity of compression buffer
- * @param nFlags compression flags (set to 0)
- * @param nMaxWindowSize maximum window size to use (0 for default)
- * @param nDictionarySize size of dictionary in front of input data (0 for none)
- * @param progress progress function, called after compressing each block, or NULL for none
- * @param pStats pointer to compression stats that are filled if this function is successful, or NULL
- *
- * @return actual compressed size, or -1 for error
- */
-		if (size) {
-			int comprsize=0;
-			int choosen_compress_method=0;
-			if (do_compress==-1 || do_compress==1) {
-				comprsize= apultra_compress(buf,
-						bufcompr,
-						size,
-						sizeof(bufcompr),
-						0,
-						255,//256 - cycle buffer size as well as compression window, one byte less works
-						0, 
-						NULL,
-						NULL);
-				choosen_compress_method=1;
-			}
-			if (do_compress==-1 || do_compress==2) {
-				// block compression, to do.
-				int comprsize2=compressAPLBlockByBlock(buf,size,bufcompr2);
+		printf("File loaded %s %d\n",path,size);
+		int filetype=checkTypeByPath(path);
+		if (filetype==TYPE_XEX) {
+			size=repairFile(buf,size);
+			// compress file, get new size.
+			if (size) {
+				int comprsize=0;
+				int choosen_compress_method=0;
+				if (do_compress==-1 || do_compress==1) {
+					/**
+					 * Compress memory
+					 *
+					 * @param pInputData pointer to input(source) data to compress
+					 * @param pOutBuffer buffer for compressed data
+					 * @param nInputSize input(source) size in bytes
+					 * @param nMaxOutBufferSize maximum capacity of compression buffer
+					 * @param nFlags compression flags (set to 0)
+					 * @param nMaxWindowSize maximum window size to use (0 for default)
+					 * @param nDictionarySize size of dictionary in front of input data (0 for none)
+					 * @param progress progress function, called after compressing each block, or NULL for none
+					 * @param pStats pointer to compression stats that are filled if this function is successful, or NULL
+					 *
+					 * @return actual compressed size, or -1 for error
+					 */
+					comprsize= apultra_compress(buf,
+							bufcompr,
+							size,
+							sizeof(bufcompr),
+							0,
+							255,//256 - cycle buffer size as well as compression window, one byte less works
+							0, 
+							NULL,
+							NULL);
+					choosen_compress_method=1;
+				}
+				if (do_compress==-1 || do_compress==2) {
+					// block compression, to do.
+					int comprsize2=compressAPLBlockByBlock(buf,size,bufcompr2);
 
-				if (comprsize2<comprsize || do_compress>0)
+					if (comprsize2<comprsize || do_compress>0)
+					{
+						int j;
+						for (j=0; j<comprsize2; j++) {bufcompr[j]=bufcompr2[j];};
+						comprsize=comprsize2;
+						choosen_compress_method=2;
+
+					}
+				}
+
+				//saveRAW(buf,size);
+				if (do_compress && ((comprsize < size) || do_compress>=1)) // forced 
 				{
-					int j;
-					for (j=0; j<comprsize2; j++) {bufcompr[j]=bufcompr2[j];};
-					comprsize=comprsize2;
-					choosen_compress_method=2;
+
+					flags|=((choosen_compress_method)<<4);
+					unsigned int over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags);
+					advance=1;
+					if (over) {
+						if (be_verbose)
+							printf("skipped: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
+					}
+					else {
+						if (be_verbose)
+							printf("compressed: \"%s\", method %d, length (compr/uncompr): %d/%d, ratio %d%%\n",name,choosen_compress_method,comprsize,size,comprsize*100/size);
+						osize+=comprsize;
+						ncsize+=size;
+					}
+
 
 				}
+				else if ((comprsize >= size)||!do_compress)
+				{
+					unsigned int over=insertPos(name,data,carsize,pos,buf,size,flags);
+					advance=1;
+					if (over) {
+						if (be_verbose)
+							printf("skipped: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
+					}
+					else	{
+						if (be_verbose)
+							printf("added without compression.\n");
+						osize+=size;
+						ncsize+=size;
+					}
+				}
+				else
+				{clearPos(data,pos);};
 			}
-
-			//saveRAW(buf,size);
-			if (do_compress && ((comprsize < size) || do_compress>=1)) // forced 
+		}
+		else if (filetype==TYPE_CAR)
+		{
+			if (size==0x2010)
 			{
-				
-				flags|=((choosen_compress_method)<<4);
-				unsigned int over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags);
+				unsigned int over=insertCartPos(name,data,carsize,pos,&buf[16],0x2000,flags);
+				osize+=size&0xf800;
+				ncsize+=size&0xf800;
 				advance=1;
-				if (over) {
-					if (be_verbose)
-						printf("skipped: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
-				}
-				else {
-					if (be_verbose)
-						printf("compressed: \"%s\", method %d, length (compr/uncompr): %d/%d, ratio %d%%\n",name,choosen_compress_method,comprsize,size,comprsize*100/size);
-					osize+=comprsize;
-					ncsize+=size;
-				}
-
-
 			}
-			else if ((comprsize >= size)||!do_compress)
-			{
-				unsigned int over=insertPos(name,data,carsize,pos,buf,size,flags);
-				advance=1;
-				if (over) {
-					if (be_verbose)
-						printf("skipped: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
-				}
-				else	{
-					if (be_verbose)
-						printf("added without compression.\n");
-					osize+=size;
-					ncsize+=size;
-				}
-			}
-			else
-			{clearPos(data,pos);};
 		}
 	}
-	else {clearPos(data,pos);};
+	else
+	{
+		clearPos(data,pos);
+	};
 	pos+=advance;
 	return pos;
 }
@@ -488,7 +589,7 @@ U8 readLine(FILE *pf,char *name, char *path, char *add)
 		if (feof(pf)) {i=NAMELEN;}
 		else
 		{
-			fread(b,sizeof(U8),sizeof(b),pf);
+			fread(b,sizeof(U8),sizeof(b),pf); // read one byte
 			rb=b[0];
 			if (rb==0x0D)
 			{
@@ -582,25 +683,17 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 	};
 };
 /*--------------------------------------------------------------------*/
-#define TYPE_CAR	1
-#define TYPE_BIN	2
-#define	TYPE_XEX	3
-#define TYPE_UNKNOWN	0
-
 U8 saveCAR(const char *filename, U8 *data, unsigned int carsize)
 {
 	U8 header[16]={0x43, 0x41, 0x52, 0x54, 0x00, 0x00, 0x00, 0x2A,
 		           0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00};
 
-	if (filename==NULL)
+	if (filename==NULL) {
 		fprintf(stderr,"Warning: -o not provided, no output generated.\n");
+		return 0;
+	}
 
-	int output_type=TYPE_UNKNOWN;
-
-	if (strcmp(&filename[strlen(filename)-4],".car")==0) output_type=TYPE_CAR;
-	if (strcmp(&filename[strlen(filename)-4],".bin")==0) output_type=TYPE_BIN;
-	if (strcmp(&filename[strlen(filename)-4],".xex")==0) output_type=TYPE_XEX;
-
+	int output_type=checkTypeByPath(filename);
 	U8 ret=0;
 	unsigned int i,j,sum=0;
 	FILE *pf;
