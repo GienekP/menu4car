@@ -102,64 +102,167 @@ RESETCD	= $E477
 		ORG $A000
 screen_data
 		.print "#define	SCREENDATA_OFFSET	0x",*-$a000
-		:+97 dta d'                                '
+		:+104 dta d'                                '
 
 ;-----------------------------------------------------------------------		
 		.print "#define	DATAARRAY_OFFSET	0x",*-$a000
 ;-----------------------------------------------------------------------		
-; Table of files
-; BH BL HS LS
-table0	:+(105) dta 0
-table1	:+(105) dta 0
-table2	:+(105) dta 0
-table3	:+(105) dta 0
+; Table of files:
+; table of types
+tabtyp	:+(105) dta 0
+; bank part of address
+tabbnk	:+(105) dta 0
+; in-bank adress lo byte 
+tabalo	:+(105) dta 0
+; in-bank adress hi byte 
+tabahi	:+(105) dta 0
+; translate table - position in menu
+tabpos	:+(105) dta 0
 
 ;-----------------------------------------------------------------------		
 ; ANTIC PROGRAM
 antic	:+1 dta $70
 		dta $4F,<pic,>pic
 		:+15 dta $0F
-		:+26 dta $02
+		dta $42,<screen_data,>screen_data
+		:+25 dta $02
 		dta $41,<antic,>antic
 		
+;-----------------------------------------------------------------------		
+; CTABLE
+		.print "#define	COLORTABLE_OFFSET	0x",*-$a000
+ctable		dta $06,$16,$26,$36,$46,$56,$66,$76,$86,$96,$a6,$b6,$c6,$d6,$e6,$f6
 
 ;-----------------------------------------------------------------------		
-; Menu4CAR Logo
-		.align $200,$ff
-		.print "#define	PICTURE_DATA_OFFSET	0x",*-$a000
-pic		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $03, $80, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $1e, $03, $c0, $00, $00, $00, $00
-		dta $07, $80, $7d, $8f, $c0, $ff, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $1f, $07, $c0, $00, $00, $00, $00
-		dta $07, $80, $ff, $8f, $c0, $ff, $80, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $07, $07, $00, $00, $00, $00, $00
-		dta $0d, $81, $c3, $83, $e0, $61, $c0, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $07, $8f, $07, $c1, $de, $0e, $1c
-		dta $0d, $83, $81, $83, $60, $60, $c0, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $07, $8f, $1f, $f1, $ff, $0e, $1c
-		dta $19, $83, $01, $83, $60, $60, $c0, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $06, $db, $18, $30, $e1, $86, $0c
-		dta $19, $83, $00, $06, $30, $61, $c0, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $06, $db, $30, $18, $c1, $86, $0c
-		dta $31, $83, $00, $06, $30, $7f, $80, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $06, $73, $3f, $f8, $c1, $86, $0c
-		dta $61, $83, $00, $0f, $f8, $7f, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $06, $73, $3f, $f8, $c1, $86, $0c
-		dta $7f, $e3, $00, $0f, $f8, $63, $80, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $06, $23, $30, $00, $c1, $86, $0c
-		dta $7f, $e3, $81, $98, $0c, $61, $80, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $06, $03, $18, $18, $c1, $86, $1c
-		dta $01, $81, $c3, $98, $0c, $61, $c0, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $1f, $cf, $df, $f9, $e3, $c3, $fe
-		dta $07, $e0, $ff, $7e, $3f, $fc, $f0, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $1f, $cf, $c7, $e1, $e3, $c1, $ee
-		dta $07, $e0, $7e, $7e, $3f, $fc, $70, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+; $0400 CODE
+; CLR $A000 - $BFFF
+CLPRS		; a=0; y=0
+		sta $D5FF
+@		sta CADR:$a000,y
+		iny
+		bne @-
+		inc CADR+1
+		bit CADR+1
+		bvc @-
+		sta $D500
+		rts		
+CLPRE		
 ;-----------------------------------------------------------------------		
+; STACK CODE FOR NORMAL AND BLOCK COMPRESSED
+DTACPYS
+; THREE entry points:
+; GETBYTE - gets byte from cart or whatever
+; PUTBYTE - puts byte to ram
+; GETRBTE - copies byte from ram to ram
+; the goal was to keep one instance of ADRSRC and ADRDST
+
+GETBYTE	sta $D500 ; will be updated to bank number; entry point
+ADRSRC	lda $FFFF
+BACKC	sta $D500 
+	rts
+PUTBYTE	sta $D5FF	; entry point
+ADRDST	sta $FFFF
+	clc
+	bcc BACKC
+GETRBTE sta $D5FF ; entry point
+	clc
+ADRRSRC	lda $FFFF
+	bcc BACKC
+
+DTACPYE
+;-----------------------------------------------------------------------		
+; STACK CODE FOR COMPRESSED 256-byte Windowed
+DTA256CPYS
+; FOUR entry points:
+; GETBYTE - gets byte from cart or whatever
+; PUTBYTE - puts byte to ram
+;  - copies byte from ram to ram
+; the goal was to keep one instance of ADRSRC and ADRDST
+; names are prefixed to avoid double declaration
+; first code part must be a duplicate of previous block
+; cyclic buffer procs must fit into place of GETRBTE proc and substitutes it.
+_GETBYTE	sta $D500 ; will be updated to bank number; entry point
+_ADRSRC	lda $FFFF
+_BACKC	sta $D500 
+	rts
+_PUTBYTE	sta $D5FF	; entry point
+_ADRDST	sta $FFFF
+	clc
+	bcc _BACKC
+CYCL256 sta $500 ; entry point
+	rts
+SRCP256	lda $500 ; entry point
+	rts
+	nop	;IMPORTANT to get the same size as previous code section
+
+DTA256CPYE
+;--------------------------------------------
+ENTRYS	sta $D5FF
+		lda TRIG3
+		sta GINTLK
+		cli
+ADRRUN	jsr RESETCD
+		sei
+		sta $D500
+ADRBCK	jmp EXIT
+ENTRYE
+
+;--------------------------------------------
+; RUNCART ram procedure
+; copies procedure to ram.
+; In ram:
+; sets proper cart bank (passed in A)
+; clears stack and jumps to $e477
+; this lets the cart to be properly initialized
+; dos load etc.
+RUNCARTS
+		tay
+		sta $d500,y
+		lda #0
+		sta COLDST
+		jmp RESETCD
+
+RUNCARTE
+;-----------------------------------------------------------------------		
+; Copy Clear to $0400
+CopyCLR	ldx #(CLPRE-CLPRS-1)
+@		lda CLPRS,X
+		sta $0400,X
+		dex
+		bpl @-
+		lda #0
+		ldy #1
+		sty CRITIC
+		tay
+		jsr $0400	
+		ldy TRIG3
+		sty GINTLK
+		sta CRITIC
+		ldx #(CLPRE-CLPRS-1)
+@		lda #$00
+		sta $0400,X
+		dex
+		bpl @-		
+		rts
+
+;-----------------------------------------------------------------------		
+; Copy Copy to Stack
+CopyCPY	ldx #(DTACPYE-DTACPYS)
+@		lda DTACPYS-1,X
+		sta $0200-(DTACPYE-DTACPYS+1),X
+		dex
+		bne @-
+		rts
+		
+;-----------------------------------------------------------------------		
+; Copy Copy256 to Stack
+CopyCPY256	ldx #(DTA256CPYE-DTA256CPYS)
+@		lda DTA256CPYS-1,X
+		sta $0200-(DTA256CPYE-DTA256CPYS+1),X
+		dex
+		bne @-
+		rts
+		
 ;-----------------------------------------------------------------------		
 ; FONTS
 		ORG $B000
@@ -230,15 +333,53 @@ fonts		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $18, $18, $18, $18, $00,
 		dta $18, $18, $18, $18, $18, $18, $18, $18, $00, $7e, $78, $7c, $6e, $66, $06, $00
 		dta $08, $18, $38, $78, $38, $18, $08, $00, $10, $18, $1c, $1e, $1c, $18, $10, $00
 ;-----------------------------------------------------------------------		
+; Menu4CAR Logo
+		.align $200,$ff
+		.print "#define	PICTURE_DATA_OFFSET	0x",*-$a000
+pic		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $03, $80, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $1e, $03, $c0, $00, $00, $00, $00
+		dta $07, $80, $7d, $8f, $c0, $ff, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $1f, $07, $c0, $00, $00, $00, $00
+		dta $07, $80, $ff, $8f, $c0, $ff, $80, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $07, $07, $00, $00, $00, $00, $00
+		dta $0d, $81, $c3, $83, $e0, $61, $c0, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $07, $8f, $07, $c1, $de, $0e, $1c
+		dta $0d, $83, $81, $83, $60, $60, $c0, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $07, $8f, $1f, $f1, $ff, $0e, $1c
+		dta $19, $83, $01, $83, $60, $60, $c0, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $06, $db, $18, $30, $e1, $86, $0c
+		dta $19, $83, $00, $06, $30, $61, $c0, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $06, $db, $30, $18, $c1, $86, $0c
+		dta $31, $83, $00, $06, $30, $7f, $80, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $06, $73, $3f, $f8, $c1, $86, $0c
+		dta $61, $83, $00, $0f, $f8, $7f, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $06, $73, $3f, $f8, $c1, $86, $0c
+		dta $7f, $e3, $00, $0f, $f8, $63, $80, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $06, $23, $30, $00, $c1, $86, $0c
+		dta $7f, $e3, $81, $98, $0c, $61, $80, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $06, $03, $18, $18, $c1, $86, $1c
+		dta $01, $81, $c3, $98, $0c, $61, $c0, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $1f, $cf, $df, $f9, $e3, $c3, $fe
+		dta $07, $e0, $ff, $7e, $3f, $fc, $f0, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $1f, $cf, $c7, $e1, $e3, $c1, $ee
+		dta $07, $e0, $7e, $7e, $3f, $fc, $70, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+;-----------------------------------------------------------------------		
+; Keyboard Table
+;		     A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
+KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,$2F,$28,$3E,$2D,$0B,$10,$2E,$16,$2B,$17
+
+;-----------------------------------------------------------------------		
+;-----------------------------------------------------------------------		
 ; P/M DATA
 ;		.print "#define	PM_DATA_OFFSET	0x",*-$a000
 		
 ;pm		:+1024 dta $00
 
-;-----------------------------------------------------------------------		
-; CTABLE
-		.print "#define	COLORTABLE_OFFSET	0x",*-$a000
-ctable		dta $06,$16,$26,$36,$46,$56,$66,$76,$86,$96,$a6,$b6,$c6,$d6,$e6,$f6
 
 ;-----------------------------------------------------------------------		
 ;
@@ -333,7 +474,7 @@ BEGIN	jsr TESTSEL
 		; Chose XEX
 		ldx #$ff
 @		inx
-		lda table0,X
+		lda tabtyp,X
 		bpl @-
 		;--------
 		; RUN if only one pos
@@ -379,9 +520,18 @@ RANDOPT	lda RANDOM
 		bcs RANDOPT
 		sta POS	; set random pos
 		bcc RESTORE
-FINDKEY	dex
+FINDKEY		dex
 		cpx CNT
 		bcs RANDOPT ; random if bigger than SNT
+		stx POS
+		ldx CNT
+		dex 
+@		lda tabpos,x
+		cmp POS
+		beq @+
+		dex
+		bne @-
+@
 		stx POS ; set pos by key pressed
 
 		;--------	
@@ -557,7 +707,7 @@ LOADPOS
 		sta INITAD+1
 
 		ldx POS
-		lda table0,X
+		lda tabtyp,X
 		and #7
 		cmp	#0
 		beq	LOADXEX
@@ -577,18 +727,11 @@ LOADBASIC
 LOADCAR		; 8 kb car area straight mapping
 		jsr	CopyRunCart
 		ldx	POS
-		lda	table1,X ; bank
+		lda	tabbnk,X ; bank
 		jmp	RUNCART
-		; RUNCART ram procedure
-		; copies procedure to ram.
-		; In ram:
-		; sets proper cart bank (passed in A)
-		; clears stack and jumps to $e477
-		; this lets the cart to be properly initialized
-		; dos load etc.
 		
 LOADXEX		ldx	POS
-		lda	table0,X
+		lda	tabtyp,X
 		and	#$70
 		beq	READRAWXEX
 		cmp	#$20
@@ -852,11 +995,11 @@ CRUNPART
 ; Set Source by POSx4 value
 SETPOSSRC
 		ldx POS
-		lda table1,X	; BANK ->A
+		lda tabbnk,X	; BANK ->A
 		sta BANK
-		lda table2,X	; MSB ->Y
+		lda tabahi,X	; MSB ->Y
 		sta SRC+1
-		lda table3,X	; LSB ->X
+		lda tabalo,X	; LSB ->X
 		sta SRC
 		rts
 
@@ -880,13 +1023,13 @@ IncSrc	inc SRC
 @
 		; Cmp Source
 		ldx POS
-		lda table3+4,X
+		lda tabalo+4,X
 		cmp SRC
 		bne @+
-		lda table2+4,X
+		lda tabahi+4,X
 		cmp SRC+1
 		bne @+
-		lda table1+4,X
+		lda tabbnk+4,X
 		cmp BANK
 		bne @+
 		sec
@@ -921,46 +1064,6 @@ CmpDst	lda DST
 		rts
 
 ;-----------------------------------------------------------------------		
-; Copy Clear to $0400
-CopyCLR	ldx #(CLPRE-CLPRS-1)
-@		lda CLPRS,X
-		sta $0400,X
-		dex
-		bpl @-
-		lda #0
-		ldy #1
-		sty CRITIC
-		tay
-		jsr $0400	
-		ldy TRIG3
-		sty GINTLK
-		sta CRITIC
-		ldx #(CLPRE-CLPRS-1)
-@		lda #$00
-		sta $0400,X
-		dex
-		bpl @-		
-		rts
-
-;-----------------------------------------------------------------------		
-; Copy Copy to Stack
-CopyCPY	ldx #(DTACPYE-DTACPYS)
-@		lda DTACPYS-1,X
-		sta $0200-(DTACPYE-DTACPYS+1),X
-		dex
-		bne @-
-		rts
-		
-;-----------------------------------------------------------------------		
-; Copy Copy256 to Stack
-CopyCPY256	ldx #(DTA256CPYE-DTA256CPYS)
-@		lda DTA256CPYS-1,X
-		sta $0200-(DTA256CPYE-DTA256CPYS+1),X
-		dex
-		bne @-
-		rts
-		
-;-----------------------------------------------------------------------		
 ; Copy Entry to Stack
 CopyENT	ldx #(ENTRYE-ENTRYS)
 @		lda ENTRYS-1,X
@@ -990,103 +1093,9 @@ TESTSEL	lda CONSOL
 DISCART sta $D5FF
 		jmp RESETCD
 CONTIN	rts		
-;-----------------------------------------------------------------------		
-; Keyboard Table
-;		     A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
-KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,$2F,$28,$3E,$2D,$0B,$10,$2E,$16,$2B,$17
 ;-----------------------------------------------------------------------
 		icl "apldecr_zp.asm"
 		
-;-----------------------------------------------------------------------		
-; $0400 CODE
-; CLR $A000 - $BFFF
-CLPRS		; a=0; y=0
-		sta $D5FF
-@		sta CADR:$a000,y
-		iny
-		bne @-
-		inc CADR+1
-		bit CADR+1
-		bvc @-
-		sta $D500
-		rts		
-CLPRE		
-;-----------------------------------------------------------------------		
-; STACK CODE FOR NORMAL AND BLOCK COMPRESSED
-DTACPYS
-; THREE entry points:
-; GETBYTE - gets byte from cart or whatever
-; PUTBYTE - puts byte to ram
-; GETRBTE - copies byte from ram to ram
-; the goal was to keep one instance of ADRSRC and ADRDST
-
-GETBYTE	sta $D500 ; will be updated to bank number; entry point
-ADRSRC	lda $FFFF
-BACKC	sta $D500 
-	rts
-PUTBYTE	sta $D5FF	; entry point
-ADRDST	sta $FFFF
-	clc
-	bcc BACKC
-GETRBTE sta $D5FF ; entry point
-	clc
-ADRRSRC	lda $FFFF
-	bcc BACKC
-
-DTACPYE
-;-----------------------------------------------------------------------		
-; STACK CODE FOR COMPRESSED 256-byte Windowed
-DTA256CPYS
-; FOUR entry points:
-; GETBYTE - gets byte from cart or whatever
-; PUTBYTE - puts byte to ram
-;  - copies byte from ram to ram
-; the goal was to keep one instance of ADRSRC and ADRDST
-; names are prefixed to avoid double declaration
-; first code part must be a duplicate of previous block
-; cyclic buffer procs must fit into place of GETRBTE proc and substitutes it.
-_GETBYTE	sta $D500 ; will be updated to bank number; entry point
-_ADRSRC	lda $FFFF
-_BACKC	sta $D500 
-	rts
-_PUTBYTE	sta $D5FF	; entry point
-_ADRDST	sta $FFFF
-	clc
-	bcc _BACKC
-CYCL256 sta $500 ; entry point
-	rts
-SRCP256	lda $500 ; entry point
-	rts
-	nop	;IMPORTANT to get the same size as previous code section
-
-DTA256CPYE
-;--------------------------------------------
-ENTRYS	sta $D5FF
-		lda TRIG3
-		sta GINTLK
-		cli
-ADRRUN	jsr RESETCD
-		sei
-		sta $D500
-ADRBCK	jmp EXIT
-ENTRYE
-
-;--------------------------------------------
-; RUNCART ram procedure
-; copies procedure to ram.
-; In ram:
-; sets proper cart bank (passed in A)
-; clears stack and jumps to $e477
-; this lets the cart to be properly initialized
-; dos load etc.
-RUNCARTS
-		tay
-		sta $d500,y
-		lda #0
-		sta COLDST
-		jmp RESETCD
-
-RUNCARTE
 	.print"End of code: ",*
 ;-----------------------------------------------------------------------		
 ; INITCART ROUTINE - back from old MaxFlash

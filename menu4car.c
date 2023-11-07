@@ -25,12 +25,22 @@ typedef unsigned char U8;
 #define MAX_ENTRIES	104
 #define MAX_ENTRIES_1	(MAX_ENTRIES+1)
 
+// those types correspond to .asm file
+#define	TYPE_XEX	0
+#define	TYPE_BOOT	1
+#define	TYPE_ATR	2
+#define TYPE_BAS	3
+#define TYPE_CAR	4
+// this is for another use, for output without car header
+#define TYPE_BIN	20
+#define TYPE_UNKNOWN	-1
+
 // provided from .asm mads compile
 #define         SCREENDATA_OFFSET	0x0000
-#define         DATAARRAY_OFFSET	0x0C20
-#define         COLORTABLE_OFFSET	0x0DD4
-#define         PICTURE_DATA_OFFSET	0x0E00
+#define         DATAARRAY_OFFSET	0x0D00
+#define         COLORTABLE_OFFSET	0x0F3D
 #define         FONT_OFFSET		0x1000
+#define         PICTURE_DATA_OFFSET	0x1400
 /*--------------------------------------------------------------------*/
 #include "menu4car.h"
 #include "apultra/src/libapultra.h"
@@ -116,35 +126,146 @@ void fillATASCII(U8 *txt, const U8 *name, unsigned int limit)
 	};
 }
 /*--------------------------------------------------------------------*/
+#define DAOFFS(i,f) (DATAARRAY_OFFSET+(i)+(f)*MAX_ENTRIES_1)
+#define GETADDR(_data,_pos)	(((_data[DAOFFS(_pos,1)])*BANKSIZE)|(((_data[DAOFFS(_pos,3)]<<8)|_data[DAOFFS(_pos,2)])&0x1FFF));
+#define GETBANK(_data,_pos)	(_data[DAOFFS(_pos,1)])
+#define GETCMPR(_data,_pos)	(_data[DAOFFS(_pos,0)]&0x70)
+#define GETTYPE(_data,_pos)	(_data[DAOFFS(_pos,0)]&0x7)
+#define IS_LAST(_data,_pos)	(_data[DAOFFS(_pos,0)]&0x80)
+#define SETDATA(_data,_pos,_flags,_bank,_adr,_tpos) {\
+	data[DAOFFS(_pos,0)]=_flags;\
+	data[DAOFFS(_pos,1)]=_bank;\
+	data[DAOFFS(_pos,2)]=((_adr)&0xFF);\
+	data[DAOFFS(_pos,3)]=(((_adr)>>8)&0x1F);\
+	data[DAOFFS(_pos,4)]=_tpos;\
+	}
+int findLastCarPos(U8 * data){
+	int lpos=0;
+	int last=-1;
+	while (lpos<MAX_ENTRIES)
+	{
+		if (GETTYPE(data,lpos)==TYPE_CAR) // bank
+			last=lpos;
+		lpos++;
+	}
+	return last; // here returns "no room"
+}
+/*--------------------------------------------------------------------*/
+void outTable(U8 * data) {
+
+	int i=0;
+	while (i<MAX_ENTRIES) {
+		int start=GETADDR(data,i);
+		printf("Data: pos: %d, flags: %02x, bank: %02x, addr: %06x, pos: %d\n",i,GETTYPE(data,i),GETBANK(data,i),start,data[DAOFFS(i,4)]);
+		if (IS_LAST(data,i)) break; // flags
+		i++;
+	}
+}
+
+/*--------------------------------------------------------------------*/
+void getRoomFor8kBCart(U8 * data,int ipos, const U8 * cbuf)
+{
+	// 1. move data one bank up.
+	// get start addr
+	int start=GETADDR(data,ipos);
+	int stop=start;
+
+	// get last stop addr
+	int i=0;
+	while (i<MAX_ENTRIES){
+		if (IS_LAST(data,i)) {
+			stop=GETADDR(data,i);
+			printf("Found end at pos %d, value: %06x\n",i,stop);
+			break;
+		}
+		i++;
+	}
+
+	// now copy data 8kB up
+	//if (stop==0) stop=start;
+	printf("Moving 8kB to free place for cart, size: %04x, %06x-%06x to %06x-%06x\n",stop-start,start,stop,start+0x2000,stop+0x2000);
+	for (int k=stop-1; k>=start; k--) {
+		data[k+0x2000]=data[k];
+		data[k]=0;
+		//printf("%06x ",k);
+	}
+	printf("Store cart: %06x\n",start);
+	for (i=0; i<0x2000; i++) {data[start+i]=cbuf[i];};
+
+	// also moving entries and store under current
+	i=103;
+	while (i>=ipos) {
+		data[DAOFFS(i+1,0)]=data[DAOFFS(i,0)];
+		data[DAOFFS(i+1,1)]=data[DAOFFS(i,1)];
+		data[DAOFFS(i+1,2)]=data[DAOFFS(i,2)];
+		data[DAOFFS(i+1,3)]=data[DAOFFS(i,3)];
+		data[DAOFFS(i+1,4)]=data[DAOFFS(i,4)];
+		i--;
+	}
+
+	i=0;
+	// 2. update pos chain by adding 1 to bank
+	while (i<MAX_ENTRIES_1)
+	{
+			
+		if (GETTYPE(data,i)!=TYPE_CAR)
+			GETBANK(data,i)++; // inc bank and mark free 8kB
+
+		if (IS_LAST(data,i)) break;
+		i++;
+	}
+}
+/*--------------------------------------------------------------------*/
 unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigned int pos,
 					const U8 *buf, unsigned int size,int flags)
 {
 	unsigned int i,ret=0;
 	unsigned int start,stop;
 	int SC_POS_OFFSET=SCREENDATA_OFFSET+32*pos;
-	int DA_POS_OFFSET=DATAARRAY_OFFSET+pos;
+	//int DA_POS_OFFSET=DATAARRAY_OFFSET+pos;
 	if (pos==0) 
 	{	// init first entry as end marker
-		data[DA_POS_OFFSET+0*MAX_ENTRIES_1]=0x80; // flags
-		data[DA_POS_OFFSET+1*MAX_ENTRIES_1]=1; // bank
-		data[DA_POS_OFFSET+2*MAX_ENTRIES_1]=0; // abs adr in bank hi (A000-based)
-		data[DA_POS_OFFSET+3*MAX_ENTRIES_1]=0; // abs adr in bank lo (A000-based)
+		SETDATA(data,pos,0x80,1,0x0000,0);
 	}
 		
-	unsigned int bank=data[DA_POS_OFFSET+1*MAX_ENTRIES_1];
-	unsigned int ah  =data[DA_POS_OFFSET+2*MAX_ENTRIES_1];
-	unsigned int al  =data[DA_POS_OFFSET+3*MAX_ENTRIES_1];
-	start=(((bank)*BANKSIZE)|(((ah<<8)|al)&0x1FFF));
+	start=GETADDR(data,pos);
 	stop=(start+size);
+	printf("Start: %06x, stop: %06x\n",start,stop);
 	if (stop<=carsize) {// if fits
-		data[DA_POS_OFFSET]=flags&0x7f; // overwrite with current
 
-		for (i=0; i<size; i++) {data[start+i]=buf[i];};
 
-		data[DA_POS_OFFSET+1+0*MAX_ENTRIES_1]=0x80; // mark as last in advance.
-		data[DA_POS_OFFSET+1+1*MAX_ENTRIES_1]=((stop/BANKSIZE)&0x7F);
-		data[DA_POS_OFFSET+1+2*MAX_ENTRIES_1]=((stop>>8)&0x1F);
-		data[DA_POS_OFFSET+1+3*MAX_ENTRIES_1]=(stop&0xFF);
+		// if is CAR then copy slot to next before setting
+		// on the asm side there will be two POSes, one for START
+		// and second for STOP
+		if ((flags & 7) ==TYPE_CAR) { // move the last to next slot
+			// insert car data:
+			// find last cart slot and get the bank, or -1 if not found any
+			int lcartpos=findLastCarPos(data);
+
+			int lcartstart=BANKSIZE; // by default
+			int lcartbank=lcartpos>=0?GETBANK(data,lcartpos):0;
+			if (lcartpos>=0) lcartstart=GETADDR(data,lcartbank);
+
+			printf("lcartpos: %d lcartbank: %d lcartstart: %06x\n",lcartpos,lcartbank,lcartstart);
+			outTable(data);
+
+			getRoomFor8kBCart(data,lcartbank,buf);
+
+			SETDATA(data,lcartbank,flags&0x7f,lcartbank+1,lcartstart,pos);
+			//move last entry one pos up
+			//SETDATA(data,pos+1,0x80,((stop/BANKSIZE)&0x7F),stop);
+		}
+		else 
+		{
+			// update "last" flags - stop becomes start
+			data[DAOFFS(pos,0)]=flags;
+			data[DAOFFS(pos,4)]=pos;
+
+			// fill with data
+			for (i=0; i<size; i++) {data[start+i]=buf[i];};
+			// mark as last in advance.
+			SETDATA(data,pos+1,0x80,((stop/BANKSIZE)&0x7F),stop,0);
+		}
 
 		data[SC_POS_OFFSET+3]='A'+pos-0x20;
 		data[SC_POS_OFFSET+4]='.'-0x20;
@@ -155,60 +276,6 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 		ret=stop-carsize;
 		stop=start;
 	}
-
-	if (be_verbose)
-		printf("Adding at: $%06x: file \"%s\", length %d bytes... ",start,name,size);
-	return ret;
-}
-/*--------------------------------------------------------------------*/
-unsigned int insertCartPos(const char *name, U8 *data, unsigned int carsize, unsigned int pos,
-					const U8 *buf, unsigned int size,int flags)
-{
-	unsigned int i,ret=0;
-	unsigned int start,stop;
-	int SC_POS_OFFSET=SCREENDATA_OFFSET+32*pos;
-	int DA_POS_OFFSET=DATAARRAY_OFFSET+pos;
-	if (pos==0) 
-	{
-		start=BANKSIZE;
-		stop=(start+size);
-		if (stop<=carsize) {
-			data[DA_POS_OFFSET+0*MAX_ENTRIES_1]=flags; // flags
-			data[DA_POS_OFFSET+1*MAX_ENTRIES_1]=1; // bank
-			data[DA_POS_OFFSET+2*MAX_ENTRIES_1]=0; // abs adr in bank hi (A000-based)
-			data[DA_POS_OFFSET+3*MAX_ENTRIES_1]=0; // abs adr in bank lo (A000-based)
-		}
-		else 
-		{
-			ret = stop-carsize;
-			stop=start;
-		}
-	}
-	else
-	{
-		unsigned int bank=data[DA_POS_OFFSET+1*MAX_ENTRIES_1];
-		unsigned int ah  =data[DA_POS_OFFSET+2*MAX_ENTRIES_1];
-		unsigned int al  =data[DA_POS_OFFSET+3*MAX_ENTRIES_1];
-		start=(((bank)*BANKSIZE)|(((ah<<8)|al)&0x1FFF));
-		stop=(start+size);
-		if (stop<=carsize) {
-			data[DA_POS_OFFSET]=flags&0x7f; // overwrite with current
-			for (i=0; i<size; i++) {data[start+i]=buf[i];};
-			data[DA_POS_OFFSET+1+0*MAX_ENTRIES_1]=0x80; // mark as last in advance.
-			data[DA_POS_OFFSET+1+1*MAX_ENTRIES_1]=((stop/BANKSIZE)&0x7F);
-			data[DA_POS_OFFSET+1+2*MAX_ENTRIES_1]=((stop>>8)&0x1F);
-			data[DA_POS_OFFSET+1+3*MAX_ENTRIES_1]=(stop&0xFF);
-
-			data[SC_POS_OFFSET+3]='A'+pos-0x20;
-			data[SC_POS_OFFSET+4]='.'-0x20;
-			fillATASCII(&data[SC_POS_OFFSET+6],(U8 *)name,24);
-		}
-		else
-		{
-		ret=stop-carsize;
-		stop=start;
-		}
-	};
 
 	if (be_verbose)
 		printf("Adding at: $%06x: file \"%s\", length %d bytes... ",start,name,size);
@@ -347,16 +414,6 @@ unsigned int compressAPLBlockByBlock(U8 *bufin, unsigned int retsize, U8 * bufou
 	return retsize;
 }
 /*--------------------------------------------------------------------*/
-// those types correspond to .asm file
-#define	TYPE_XEX	0
-#define	TYPE_BOOT	1
-#define	TYPE_ATR	2
-#define TYPE_BAS	3
-#define TYPE_CAR	4
-// this is for another use, for output without car header
-#define TYPE_BIN	20
-#define TYPE_UNKNOWN	-1
-
 int checkTypeByPath(const char * filename) {
 #define TSTEXT(f,a) strcasecmp(&(f)[strlen(f)-4],(a))==0
 
@@ -646,6 +703,7 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 				if (name[0]=='#')
 					continue;
 				addPos(data,carsize,name,path,addparams,status);
+				//outTable(data);
 				i++;
 			}
 			else
@@ -655,7 +713,7 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 		for (i=0; i<MAX_ENTRIES+1; i++)
 		{
 			int DA_POS_OFFSET=DATAARRAY_OFFSET+i;
-			if (data[DA_POS_OFFSET]!=0xFF) {data[DA_POS_OFFSET+2*MAX_ENTRIES_1]+=0xA0;};
+			if (data[DA_POS_OFFSET]!=0xFF) {data[DA_POS_OFFSET+3*MAX_ENTRIES_1]+=0xA0;};
 		};
 		fclose(pf);
 	}
