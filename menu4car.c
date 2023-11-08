@@ -175,7 +175,7 @@ void getRoomFor8kBCart(U8 * data,int ipos, const U8 * cbuf)
 	while (i<MAX_ENTRIES){
 		if (IS_LAST(data,i)) {
 			stop=GETADDR(data,i);
-			printf("Found end at pos %d, value: %06x\n",i,stop);
+			//printf("Found end at pos %d, value: %06x\n",i,stop);
 			break;
 		}
 		i++;
@@ -183,23 +183,20 @@ void getRoomFor8kBCart(U8 * data,int ipos, const U8 * cbuf)
 
 	// now copy data 8kB up
 	//if (stop==0) stop=start;
-	printf("Moving 8kB to free place for cart, size: %04x, %06x-%06x to %06x-%06x\n",stop-start,start,stop,start+0x2000,stop+0x2000);
+	//printf("Moving 8kB to free place for cart, size: %04x, %06x-%06x to %06x-%06x\n",stop-start,start,stop,start+0x2000,stop+0x2000);
 	for (int k=stop-1; k>=start; k--) {
 		data[k+0x2000]=data[k];
 		data[k]=0;
 		//printf("%06x ",k);
 	}
-	printf("Store cart: %06x\n",start);
+	//printf("Store cart: %06x\n",start);
 	for (i=0; i<0x2000; i++) {data[start+i]=cbuf[i];};
 
 	// also moving entries and store under current
 	i=103;
 	while (i>=ipos) {
-		data[DAOFFS(i+1,0)]=data[DAOFFS(i,0)];
-		data[DAOFFS(i+1,1)]=data[DAOFFS(i,1)];
-		data[DAOFFS(i+1,2)]=data[DAOFFS(i,2)];
-		data[DAOFFS(i+1,3)]=data[DAOFFS(i,3)];
-		data[DAOFFS(i+1,4)]=data[DAOFFS(i,4)];
+		for (int j=0; j<5; j++)
+			data[DAOFFS(i+1,j)]=data[DAOFFS(i,j)];
 		i--;
 	}
 
@@ -230,7 +227,7 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 		
 	start=GETADDR(data,pos);
 	stop=(start+size);
-	printf("Start: %06x, stop: %06x\n",start,stop);
+	//printf("Start: %06x, stop: %06x\n",start,stop);
 	if (stop<=carsize) {// if fits
 
 
@@ -246,8 +243,8 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 			int lcartbank=lcartpos>=0?GETBANK(data,lcartpos):0;
 			if (lcartpos>=0) lcartstart=GETADDR(data,lcartbank);
 
-			printf("lcartpos: %d lcartbank: %d lcartstart: %06x\n",lcartpos,lcartbank,lcartstart);
-			outTable(data);
+			//printf("lcartpos: %d lcartbank: %d lcartstart: %06x\n",lcartpos,lcartbank,lcartstart);
+			//outTable(data);
 
 			getRoomFor8kBCart(data,lcartbank,buf);
 
@@ -506,7 +503,8 @@ static unsigned int pos=0;
 	if (status)
 	{
 		unsigned int size=loadFile(path,buf,sizeof(buf)-BANKSIZE-6);
-		printf("File loaded %s %d\n",path,size);
+		if (be_verbose)
+			printf("File loaded %s %d\n",path,size);
 		int filetype=checkTypeByPath(path);
 		if (filetype==TYPE_XEX) {
 			size=repairFile(buf,size);
