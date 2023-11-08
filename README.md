@@ -2,19 +2,24 @@
 
 This utility let's you create a MaxFlash/JCart cart image with your favourite Atari 8-bit games.
 
-Games are to be in standard Atari Dos binary.
+File types handled:
+
+    - standard Atari Dos binary
+    - <=8kb .car cartridge image files.
 
 The example file menu4car.txt contains an input in form of sort of csv file, separated by "|" char. It is an UTF-8 encoded file with Polish diacritical letters handling as well as some German letters too.
 
 The first field is the name of the game in readable form.
-The second field is the path to the DOS binary executable (in the future more file types will be handled)
-The third optional field are the options. For now:
+The second field is the path to the DOS binary executable (extensions: .exe, .xex, .obj, .com eithercase), or 1k, 2k, 4k, 8k .car cartridge image format. Cartridge .car images are treated as ordinary 8kB cartridges and must have headers and '.car' extension. When mounted, system sees them as original cartridge (in the future more file types will be handled)
+
+The third optional field are the options. For now options for dos executables:
+
     * c0 - no compression
     * c1 - apl 256-byte window compression,
     * c2 - apl every DOS block (long enough) compression
     * ca - auto - gets the shortest compressed version (or uncompressed) from above
 
-For now maximum 26 games may be added. Sometimes some game does not work with compression (what games?), please add c0 as the option then.
+For now maximum 26 games may be added. Sometimes some game may not work with compression (what games? - please report in Issues), please add c0 as the option then for tests.
 
 When file .txt is ready, invoke:
 
