@@ -19,7 +19,7 @@ typedef unsigned char U8;
 #define FLASHMAX (2*512*1024)
 #define BANKSIZE (0x2000)
 #define PATHLEN (0x400)
-#define NAMELEN (0x30)
+#define NAMELEN (0x100)
 #define PARAMSLEN (8)
 #define DELIM	('|')
 #define MAX_ENTRIES	104
@@ -594,6 +594,27 @@ static unsigned int pos=0;
 		}
 		else if (filetype==TYPE_CAR)
 		{
+			if (size==0x410)
+			{
+				for (int i=0x10; i<0x410; i++) {buf[0x400+i]=buf[i];};
+				size+=0x400;
+				osize+=size&0xfc10;
+				ncsize+=size&0xfc10;
+			}
+			if (size==0x810)
+			{
+				for (int i=0x10; i<0x810; i++) {buf[0x800+i]=buf[i];};
+				size+=0x800;
+				osize+=size&0xfc10;
+				ncsize+=size&0xfc10;
+			}
+			if (size==0x1010)
+			{
+				for (int i=0x10; i<0x1010; i++) {buf[0x1000+i]=buf[i];};
+				size+=0x1000;
+				osize+=size&0xfc10;
+				ncsize+=size&0xfc10;
+			}
 			if (size==0x2010)
 			{
 				unsigned int over=insertPos(name,data,carsize,pos,&buf[16],0x2000,flags);
