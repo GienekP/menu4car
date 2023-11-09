@@ -295,7 +295,7 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 	}
 
 	if (be_verbose)
-		printf("Adding at: $%06x: file \"%s\", length %d bytes... ",start,name,size);
+		printf("Added, length %d.\n",size);
 	return ret;
 }
 /*--------------------------------------------------------------------*/
@@ -524,7 +524,7 @@ static unsigned int pos=0;
 	{
 		unsigned int size=loadFile(path,buf,sizeof(buf)-BANKSIZE-6);
 		if (be_verbose)
-			printf("File loaded %s %d\n",path,size);
+			printf("File loaded %s, length: %d... ",path,size);
 		int filetype=checkTypeByPath(path);
 		if (filetype==TYPE_XEX) {
 			size=repairFile(buf,size);
@@ -586,7 +586,7 @@ static unsigned int pos=0;
 					}
 					else {
 						if (be_verbose)
-							printf("Compressed: \"%s\", method %d, length (compr/uncompr): %d/%d, ratio %d%%\n",name,choosen_compress_method,comprsize,size,comprsize*100/size);
+							printf("Compressed, method %d, length (compr/uncompr): %d/%d, ratio %d%%\n",choosen_compress_method,comprsize,size,comprsize*100/size);
 						osize+=comprsize;
 						ncsize+=size;
 					}
