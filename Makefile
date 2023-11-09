@@ -14,8 +14,11 @@ $(MAIN).o: $(MAIN).c $(MAIN).h
 $(MAIN).h : $(MAIN).bin
 	xxd -i -c 16 "$<" "$@"
 
+test : $(MAIN).asm apldecr_zp.asm
+	mads "$<" -t -o:menu4car.obx | sed "s/\\$$//g"
+
 $(MAIN).bin : $(MAIN).asm apldecr_zp.asm
-	mads "$<" -t -o:"$@" | sed "s/\\$$//g"
+	mads "$<" -t -o:"$@" | sed "s/\\$$//g" | tee |  grep "#define" >menu4car_interface.h
 
 libapultra.a:
 	$(MAKE) -C apultra libapultra.a

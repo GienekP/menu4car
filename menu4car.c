@@ -36,11 +36,7 @@ typedef unsigned char U8;
 #define TYPE_UNKNOWN	-1
 
 // provided from .asm mads compile
-#define         SCREENDATA_OFFSET	0x0000
-#define         DATAARRAY_OFFSET	0x0D00
-#define         COLORTABLE_OFFSET	0x0F3D
-#define         FONT_OFFSET		0x1000
-#define         PICTURE_DATA_OFFSET	0x1400
+#include "menu4car_interface.h"
 /*--------------------------------------------------------------------*/
 #include "menu4car.h"
 #include "apultra/src/libapultra.h"
@@ -894,6 +890,16 @@ void addPages(U8* data)
 {
 	int i=0;
 	while (i<MAX_ENTRIES_1) { if (IS_LAST(data,i)) {--i;break;} i++; }
+
+	int ii=i+1;
+	int j=0;
+	while (ii>0) {
+		int k=MIN(26,ii);
+		ii-=k;
+		data[FILL_PAGES_OFFSET+j]=k+1;
+		j++;
+	}
+
 	int pages=i/26;
 
 	if (pages>=1)

@@ -278,7 +278,7 @@ CopyCPY256	ldx #(DTA256CPYE-DTA256CPYS)
 ; FONTS
 		ORG $B000
 		
-		.print "#define	FONT_OFFSET	0x",*-$a000
+		.print "#define	FONT_OFFSET		0x",*-$a000
 fonts		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $18, $18, $18, $18, $00, $18, $00
 		dta $00, $66, $66, $66, $00, $00, $00, $00, $00, $66, $ff, $66, $66, $ff, $66, $00
 		dta $18, $3e, $60, $3c, $06, $7c, $18, $00, $00, $66, $6c, $18, $30, $66, $46, $00
@@ -682,7 +682,7 @@ consolcont
 		cmp	#$05
 		beq	NEXT
 		cmp	#$03
-		beq	PREV
+		jeq	PREV
 		cmp	#$06
 		beq	CLICK
 checkskip
@@ -735,6 +735,8 @@ UP
 		beq	jmp
 		inc	PAGE
 jmp
+		lda	#1
+		sta	TMP
 		lda	PAGE
 		jmp	setScreen
 
@@ -746,13 +748,13 @@ CLICK	asl	TMP
 		rts
 		;--------	
 		; Next
-NEXT	lda TMP+1
+NEXT		ldy PAGE
+		lda TMP+1
 		bne @+
 		inc TMP+1
 		inc TMP
-		ldx TMP
-		dex 
-		cpx #26 ; was CNT
+		lda TMP
+		cmp FILLPAGES,y
 		bne @+
 		lda #$01
 		sta TMP
@@ -766,10 +768,14 @@ PREV	lda TMP+1
 		beq PRLAST
 		dec TMP
 		bne @+
-PRLAST	ldx #26	; was CNT
+PRLAST		ldy PAGE
+		ldx FILLPAGES,y
+		dex
 		stx TMP
 @		rts		
 PAGES		dta	0,26,52,78
+		.print "#define	FILL_PAGES_OFFSET	0x",*-$a000
+FILLPAGES	dta	0,0,0,0
 setScreen
 		ldy	VCOUNT
 		cpy	#20
