@@ -80,6 +80,27 @@ DictEntry UTF8Trans[] = {
 {"ö",0x06}, {"ü",0x09}, {"ß",0x0A}, {"£",0x08}, {"±",0x1B}, {"←",0x1E}, {"↑",0x1C}, {"→",0x1F},
 {"↓",0x1D}, {NULL,0}
 };
+U8 pagemap[] = {
+  0x80, 0x00, 0x0d, 0x00, 0x0d, 0x00, 0x0d, 0x00,
+  0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x91, 0x00, 0x11, 0x00, 0x11, 0x00, 0x11, 0x00,
+  0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x80, 0x00, 0x80, 0x00, 0x0d, 0x00, 0x0d, 0x00,
+  0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x12, 0x00, 0x92, 0x00, 0x12, 0x00, 0x12, 0x00,
+  0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x0d, 0x00, 0x80, 0x00, 0x80, 0x00, 0x0d, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00,
+  0x13, 0x00, 0x13, 0x00, 0x93, 0x00, 0x13, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00,
+  0x0d, 0x00, 0x0d, 0x00, 0x80, 0x00, 0x80, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00,
+  0x14, 0x00, 0x14, 0x00, 0x14, 0x00, 0x94, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00,
+  0x0d, 0x00, 0x0d, 0x00, 0x0d, 0x00, 0x80, 0x00
+
+};
+
 
 #define GETW(b,i) (b[(i)]|(b[(i)+1])<<8)
 #define PUTW(b,i,v) {b[(i)]=(v)&0xff;(b[(i)+1])=((v)>>8)&0xff;}
@@ -167,7 +188,6 @@ void getRoomFor8kBCart(U8 * data,int start,int ipos, const U8 * cbuf)
 {
 	// 1. move data one bank up.
 	// get start addr
-	//int start=GETADDR(data,ipos);
 	int stop=start;
 
 	// get last stop addr
@@ -267,7 +287,7 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 			SETDATA(data,pos+1,0x80,((stop/BANKSIZE)&0x7F),stop,0);
 		}
 
-		data[SC_POS_OFFSET+3]='A'+pos-0x20;
+		data[SC_POS_OFFSET+3]='A'+(pos%26)-0x20;
 		data[SC_POS_OFFSET+4]='.'-0x20;
 		fillATASCII(&data[SC_POS_OFFSET+6],(U8 *)name,24);
 	}
@@ -488,13 +508,13 @@ static unsigned int pos=0;
 			printf("SUMMARY:\n");
 			printf("Processed %d file entries.\n",pos);
 			printf("Spotted %d errors.\n",errornumbers);
-			//if (do_compress) {
-			printf("Cartridge size: %d/%06x\n",carsize,carsize);
-			printf("Cartridge data section size: %d/%06x\n",carsize-BANKSIZE,carsize-BANKSIZE);
-			printf("Overall file size before compressed: %d/0x%06x\n",ncsize,ncsize);
-			printf("Summary size taken by binaries: %d/0x%06x\n",osize,osize);
-			printf("Compression ratio: %d%%\n",osize*100/ncsize);
-			//}
+			if (default_do_compress!=0) {
+				printf("Cartridge size: %d/0x%06x\n",carsize,carsize);
+				printf("Cartridge data section size: %d/%06x\n",carsize-BANKSIZE,carsize-BANKSIZE);
+				printf("Overall file size before compressed: %d/0x%06x\n",ncsize,ncsize);
+				printf("Summary size taken by binaries: %d/0x%06x\n",osize,osize);
+				printf("Compression ratio: %d%%\n",osize*100/ncsize);
+			}
 			printf("Cartridge fill: %d%%\n",((osize+1)*200)/(2*(carsize-BANKSIZE)));
 		}
 		return 0;
@@ -721,7 +741,7 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 			U8 status=readLine(pf,name,path,addparams);
 			if (strlen(path)>0 && strlen(name)>0) {
 				if (be_verbose)
-					printf("Line read:'%s','%s','%s'\n",name,path,addparams);
+					printf("Line read num: %d, '%s','%s','%s'\n",i,name,path,addparams);
 				if (name[0]=='#')
 					continue;
 				addPos(data,carsize,name,path,addparams,status);
@@ -869,6 +889,15 @@ void addCTable(U8 * cardata, const char * colortablefile)
 	loadFile(colortablefile,&cardata[COLORTABLE_OFFSET],16);
 }
 /*--------------------------------------------------------------------*/
+void addPages(U8* cardata)
+{
+	for (int page=0; page<4; page++)
+		for (int row=0; row<17; row++)
+			for(int col=0; col<2; col++)
+				cardata[SCREENDATA_OFFSET+page*26*32+(row+4)*32+col]=pagemap[page*2+(row)*8+col];
+}
+
+/*--------------------------------------------------------------------*/
 void menu4car(const char * filemenu, const char * logo, const char * colortablefile, const char * fontpath, const char * carname, int cart_size, int default_do_compress)
 {
 	U8 cardata[CARMAX];
@@ -877,6 +906,7 @@ void menu4car(const char * filemenu, const char * logo, const char * colortablef
 	addLogo(cardata,logo,256*16,8);
 	addCTable(cardata,colortablefile);
 	addFont(cardata,fontpath);
+	addPages(cardata);
 	addData(cardata,cart_size,filemenu);
 	saveCAR(carname,cardata,FLASHMAX);
 }

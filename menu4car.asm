@@ -4,7 +4,7 @@
 ; (c) 2023 GienekP
 ;
 ;-----------------------------------------------------------------------
-ALLOC	= ($1d+$c)
+ALLOC	= ($1e+$c)
 BANK    = ($0200-(DTACPYE-GETBYTE)+1)
 SRC     = ($0200-(DTACPYE-ADRSRC)+1)
 RSRC    = ($0200-(DTACPYE-ADRRSRC)+1)
@@ -23,6 +23,7 @@ offsetH = ($0209-ALLOC)
 EBPL    = ($020a-ALLOC)
 EBPH    = ($020b-ALLOC)
 bl      = ($020c-ALLOC)
+PAGE      = ($020d-ALLOC)
 GET_FROM_CAR     = ($0200-(DTACPYE-GETBYTE))
 PUT_RAM     = ($0200-(DTACPYE-PUTBYTE))
 GET_RAM_BYTE     = ($0200-(DTACPYE-GETRBTE))
@@ -121,13 +122,17 @@ tabpos	:+(105) dta 0
 
 ;-----------------------------------------------------------------------		
 ; ANTIC PROGRAM
-antic	:+1 dta $70
+antic	:+1 dta $60
 		dta $4F,<pic,>pic
 		:+15 dta $0F
-		dta $42,<screen_data,>screen_data
-		:+25 dta $02
-		dta $41,<antic,>antic
+		dta $01,6,1 ; jump onto ram part of dli
 		
+;--------------------------------------------
+ramantic
+	dta	$42,0,$a0
+	:25 dta	$02
+	dta $41,<antic,>antic
+
 ;-----------------------------------------------------------------------		
 ; CTABLE
 		.print "#define	COLORTABLE_OFFSET	0x",*-$a000
@@ -217,9 +222,11 @@ ENTRYE
 ; dos load etc.
 RUNCARTS
 		tay
-		sta $d500,y
 		lda #0
 		sta COLDST
+		sta $d500,y
+
+;s		beq s
 		jmp RESETCD
 
 RUNCARTE
@@ -370,7 +377,7 @@ pic		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $
 		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 ;-----------------------------------------------------------------------		
 ; Keyboard Table
-;		     A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
+;		      A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
 KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,$2F,$28,$3E,$2D,$0B,$10,$2E,$16,$2B,$17
 
 ;-----------------------------------------------------------------------		
@@ -387,7 +394,7 @@ KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,
 ;
 
 BEGIN	jsr TESTSEL
-		ldx #ALLOC ; $01EB - $01FF (21 bytes) on STACK for LOADER
+		ldx #ALLOC ; several bytes on STACK for LOADER
 		lda #$EA
 @		pha
 		dex
@@ -408,6 +415,14 @@ BEGIN	jsr TESTSEL
 		
 		lda DLPTRS
 		pha
+
+		ldx #31
+@		lda ramantic-1,x
+		sta $105,x
+		dex
+		bne @-
+		stx PAGE
+	
 		lda #<antic
 		sta DLPTRS
 		lda DLPTRS+1
@@ -515,15 +530,27 @@ MLOOP	jsr PAINT
 		dex
 		bne @-
 RANDOPT	lda RANDOM
-		and #$1F
+		and #$7F ; $68 max entries
 		cmp CNT
 		bcs RANDOPT
-		sta POS	; set random pos
-		bcc RESTORE
+		sta POS	; random pos, 0<=CNT<=$67
+		bcc RESTORE ; with random  pos without key translation
 FINDKEY		dex
 		cpx CNT
-		bcs RANDOPT ; random if bigger than SNT
+		bcs RANDOPT ; random if bigger than CNT
 		stx POS
+
+		 ldx PAGE ; this has to be moved to the stage b efore
+		 beq keynxt
+		 lda POS
+@		 clc
+		 adc #26
+		 dex
+		 bne @-
+		 sta POS
+keynxt
+		; ----
+		; find the right slot
 		ldx CNT
 		dex 
 @		lda tabpos,x
@@ -533,6 +560,17 @@ FINDKEY		dex
 		bne @-
 @
 		stx POS ; set pos by key pressed
+
+		 ;ldx PAGE ; this has to be moved to the stage b efore
+		 ;beq RESTORE
+		 ;lda POS
+		 ;jmp *
+;@		 ;clc
+		 ;adc #26
+		 ;dex
+		 ;bne @-
+		 ;sta POS
+
 
 		;--------	
 		; Restore Screen	
@@ -588,7 +626,7 @@ PAINT	lda TMP
 		beq @+
 		asl
 		asl
-		adc #$0C
+		adc #$0C ; top offset for highlight bar
 @		tay
 		
 		lda #$07
@@ -601,7 +639,7 @@ PAINT	lda TMP
 		ldx #$00
 @		lda ctable,x
 		sta COLPF2
-		add #$10
+		adc #$11
 		inx
 		sta WSYNC
 		cpx #$0F
@@ -620,7 +658,7 @@ PAINT	lda TMP
 
 @		cmp VCOUNT
 		bne @-			
-		lda #$0c
+		lda #$b6
 		sta COLPF2
 		lda #$0E
 		sta COLPF1
@@ -648,22 +686,39 @@ JOYS	lda CONSOL
 		beq CLICK
 		
 		lda PORTA
-		cmp #$FD
+		:4 lsr
+		and PORTA
+		and #$f
+
+		cmp #$D
 		beq NEXT
-		cmp #$DF
-		beq NEXT
-		cmp #$FE
+		cmp #$E
 		beq PREV
-		cmp #$EF
-		beq PREV
+		cmp #$B
+		beq DOWN
+		cmp #$7
+		beq UP
 		lda TRIG0
-		beq CLICK
-		lda TRIG1
+		and TRIG1
 		beq CLICK
 			
 		lda #$00
 		sta TMP+1
-		rts	
+		rts
+		;-------
+		; Down - page next
+DOWN
+		dec	PAGE
+		dec	PAGE
+		;-------
+		; Up - page prev
+UP
+		inc	PAGE
+@		lda	PAGE
+		and	#3
+		sta	PAGE
+		jmp	setScreen
+
 		;--------	
 		; Next
 NEXT	lda TMP+1
@@ -695,6 +750,22 @@ CLICK	lda TMP
 		ora #$80
 		sta TMP
 @		rts
+setScreen
+		ldy	VCOUNT
+		cpy	#20
+		bcc	setScreen
+		tay
+		lda	pageaddrs_lo,y
+		sta	$107
+		lda	pageaddrs_hi,y
+		sta	$108
+		rts
+pageaddrs_lo
+		dta	<(0+screen_data),<($340+screen_data),<($340*2+screen_data),<($340*3+screen_data)
+pageaddrs_hi
+		dta	>(0+screen_data),>($340+screen_data),>($340*2+screen_data),>($340*3+screen_data)
+
+		
 ;-----------------------------------------------------------------------		
 ; Load POS=A
 
