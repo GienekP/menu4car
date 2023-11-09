@@ -682,7 +682,7 @@ consolcont
 		cmp	#$05
 		beq	NEXT
 		cmp	#$03
-		jeq	PREV
+		jeq	UP
 		cmp	#$06
 		beq	CLICK
 checkskip
@@ -732,9 +732,11 @@ UP
 		:5 asl
 		tax
 		lda	screen_data+32,x
-		beq	jmp
-		inc	PAGE
+		bne	jmp
+		lda	#$ff
+		sta	PAGE
 jmp
+		inc	PAGE
 		lda	#1
 		sta	TMP
 		lda	PAGE
