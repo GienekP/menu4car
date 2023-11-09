@@ -614,33 +614,32 @@ static unsigned int pos=0;
 		}
 		else if (filetype==TYPE_CAR)
 		{
-			if (size==0x410)
-			{
-				for (int i=0x10; i<0x410; i++) {buf[0x400+i]=buf[i];};
-				size+=0x400;
-				osize+=size&0xfc10;
-				ncsize+=size&0xfc10;
-			}
-			if (size==0x810)
-			{
-				for (int i=0x10; i<0x810; i++) {buf[0x800+i]=buf[i];};
-				size+=0x800;
-				osize+=size&0xfc10;
-				ncsize+=size&0xfc10;
-			}
-			if (size==0x1010)
-			{
-				for (int i=0x10; i<0x1010; i++) {buf[0x1000+i]=buf[i];};
-				size+=0x1000;
-				osize+=size&0xfc10;
-				ncsize+=size&0xfc10;
-			}
-			if (size==0x2010)
-			{
-				unsigned int over=insertPos(name,data,carsize,pos,&buf[16],0x2000,flags);
-				osize+=size&0xf800;
-				ncsize+=size&0xf800;
-				advance=1;
+			switch (size){
+				case 0x410:
+						for (int i=0x10; i<0x410; i++) {buf[0x400+i]=buf[i];};
+						size+=0x400;
+						osize+=size&0xfc10;
+						ncsize+=size&0xfc10;
+				case (0x810):
+						for (int i=0x10; i<0x810; i++) {buf[0x800+i]=buf[i];};
+						size+=0x800;
+						osize+=size&0xfc10;
+						ncsize+=size&0xfc10;
+				case (0x1010):
+						for (int i=0x10; i<0x1010; i++) {buf[0x1000+i]=buf[i];};
+						size+=0x1000;
+						osize+=size&0xfc10;
+						ncsize+=size&0xfc10;
+				case (0x2010):
+						{
+							unsigned int over=insertPos(name,data,carsize,pos,&buf[16],0x2000,flags);
+							osize+=size&0xf800;
+							ncsize+=size&0xf800;
+							advance=1;
+						}
+						break;
+				default:
+						printf("skipped: \"%s\", only <=8k cartridges are handled (size: %04x)\n",name,size);
 			}
 		}
 	}
