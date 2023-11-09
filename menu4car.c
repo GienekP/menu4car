@@ -163,11 +163,11 @@ void outTable(U8 * data) {
 }
 
 /*--------------------------------------------------------------------*/
-void getRoomFor8kBCart(U8 * data,int ipos, const U8 * cbuf)
+void getRoomFor8kBCart(U8 * data,int start,int ipos, const U8 * cbuf)
 {
 	// 1. move data one bank up.
 	// get start addr
-	int start=GETADDR(data,ipos);
+	//int start=GETADDR(data,ipos);
 	int stop=start;
 
 	// get last stop addr
@@ -238,19 +238,22 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 			// insert car data:
 			// find last cart slot and get the bank, or -1 if not found any
 			int lcartpos=findLastCarPos(data);
-
-			int lcartstart=BANKSIZE; // by default
+			// lcartpos = -1 for 0, 0 for 1 etc.
+			int lcartstart=0; // by default
 			int lcartbank=lcartpos>=0?GETBANK(data,lcartpos):0;
-			if (lcartpos>=0) lcartstart=GETADDR(data,lcartbank);
+			// lcartbank = 0 when no carts, 1 when one cart etc
+			//if (lcartpos>=0) 
+			lcartstart=GETADDR(data,lcartpos);
+			lcartstart+=BANKSIZE;
 
 			//printf("lcartpos: %d lcartbank: %d lcartstart: %06x\n",lcartpos,lcartbank,lcartstart);
 			//outTable(data);
 
-			getRoomFor8kBCart(data,lcartbank,buf);
+			getRoomFor8kBCart(data,lcartstart,lcartbank,buf);
 
 			SETDATA(data,lcartbank,flags&0x7f,lcartbank+1,lcartstart,pos);
 			//move last entry one pos up
-			//SETDATA(data,pos+1,0x80,((stop/BANKSIZE)&0x7F),stop);
+			SETDATA(data,pos+1,0x80,((stop/BANKSIZE)&0x7F),stop,0);
 		}
 		else 
 		{
