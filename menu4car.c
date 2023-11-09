@@ -582,11 +582,11 @@ static unsigned int pos=0;
 					advance=1;
 					if (over) {
 						if (be_verbose)
-							printf("skipped: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
+							printf("ERROR: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
 					}
 					else {
 						if (be_verbose)
-							printf("compressed: \"%s\", method %d, length (compr/uncompr): %d/%d, ratio %d%%\n",name,choosen_compress_method,comprsize,size,comprsize*100/size);
+							printf("Compressed: \"%s\", method %d, length (compr/uncompr): %d/%d, ratio %d%%\n",name,choosen_compress_method,comprsize,size,comprsize*100/size);
 						osize+=comprsize;
 						ncsize+=size;
 					}
@@ -599,11 +599,11 @@ static unsigned int pos=0;
 					advance=1;
 					if (over) {
 						if (be_verbose)
-							printf("skipped: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
+							printf("ERROR: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
 					}
 					else	{
 						if (be_verbose)
-							printf("added without compression.\n");
+							printf("Added without compression.\n");
 						osize+=size;
 						ncsize+=size;
 					}
@@ -639,7 +639,8 @@ static unsigned int pos=0;
 						}
 						break;
 				default:
-						printf("skipped: \"%s\", only <=8k cartridges are handled (size: %04x)\n",name,size);
+						printf("ERROR: \"%s\", only <=8k cartridges are handled (size: %04x)\n",name,size);
+						errornumbers++;
 			}
 		}
 	}
