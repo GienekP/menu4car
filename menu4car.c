@@ -80,6 +80,7 @@ DictEntry UTF8Trans[] = {
 {"ö",0x06}, {"ü",0x09}, {"ß",0x0A}, {"£",0x08}, {"±",0x1B}, {"←",0x1E}, {"↑",0x1C}, {"→",0x1F},
 {"↓",0x1D}, {NULL,0}
 };
+/*
 U8 pagemap[] = {
   0x80, 0x00, 0x0d, 0x00, 0x0d, 0x00, 0x0d, 0x00,
   0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -100,7 +101,7 @@ U8 pagemap[] = {
   0x0d, 0x00, 0x0d, 0x00, 0x0d, 0x00, 0x80, 0x00
 
 };
-
+*/
 
 #define GETW(b,i) (b[(i)]|(b[(i)+1])<<8)
 #define PUTW(b,i,v) {b[(i)]=(v)&0xff;(b[(i)+1])=((v)>>8)&0xff;}
@@ -889,12 +890,21 @@ void addCTable(U8 * cardata, const char * colortablefile)
 	loadFile(colortablefile,&cardata[COLORTABLE_OFFSET],16);
 }
 /*--------------------------------------------------------------------*/
-void addPages(U8* cardata)
+void addPages(U8* data)
 {
-	for (int page=0; page<4; page++)
-		for (int row=0; row<17; row++)
-			for(int col=0; col<2; col++)
-				cardata[SCREENDATA_OFFSET+page*26*32+(row+4)*32+col]=pagemap[page*2+(row)*8+col];
+	int i=0;
+	while (i<MAX_ENTRIES_1) { if (IS_LAST(data,i)) {--i;break;} i++; }
+	int pages=i/26;
+
+	if (pages>=1)
+		for (int page=0; page<=pages; page++)
+			for (int tpage=0; tpage<=pages; tpage++)
+				data[SCREENDATA_OFFSET+page*26*32+tpage*32]=tpage+17+128*(page==tpage);
+
+//	for (int page=0; page<pages; page++)
+//		for (int row=0; row<17; row++)
+//			for(int col=0; col<2; col++)
+//				data[SCREENDATA_OFFSET+page*26*32+(row+4)*32+col]=pagemap[page*2+(row)*8+col];
 }
 
 /*--------------------------------------------------------------------*/
@@ -906,8 +916,8 @@ void menu4car(const char * filemenu, const char * logo, const char * colortablef
 	addLogo(cardata,logo,256*16,8);
 	addCTable(cardata,colortablefile);
 	addFont(cardata,fontpath);
-	addPages(cardata);
 	addData(cardata,cart_size,filemenu);
+	addPages(cardata);
 	saveCAR(carname,cardata,FLASHMAX);
 }
 void usage() {

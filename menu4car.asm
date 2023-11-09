@@ -64,6 +64,10 @@ COLPF0S	= $02C4
 COLPF1S	= $02C5
 COLPF2S	= $02C6
 COLBAKS	= $02C8
+
+KRPDEL	= $02D9
+oldconsol	= $02DA
+oldjoy	= $02DB
 INITAD  = $02E2
 RUNAD   = $02E0
 MEMTOP  = $02E5
@@ -540,13 +544,11 @@ FINDKEY		dex
 		bcs RANDOPT ; random if bigger than CNT
 		stx POS
 
-		 ldx PAGE ; this has to be moved to the stage b efore
+		 ldx PAGE
 		 beq keynxt
 		 lda POS
 @		 clc
-		 adc #26
-		 dex
-		 bne @-
+		 adc PAGES,x
 		 sta POS
 keynxt
 		; ----
@@ -560,17 +562,6 @@ keynxt
 		bne @-
 @
 		stx POS ; set pos by key pressed
-
-		 ;ldx PAGE ; this has to be moved to the stage b efore
-		 ;beq RESTORE
-		 ;lda POS
-		 ;jmp *
-;@		 ;clc
-		 ;adc #26
-		 ;dex
-		 ;bne @-
-		 ;sta POS
-
 
 		;--------	
 		; Restore Screen	
@@ -678,17 +669,37 @@ NOBAR	rts
 ;-----------------------------------------------------------------------		
 ; /Start/Select/Option/ & JOY 1+2
 JOYS	lda CONSOL
-		cmp #$05
-		beq NEXT
-		cmp #$03
-		beq PREV
-		cmp #$06
-		beq CLICK
-		
-		lda PORTA
+		cmp #$07
+		beq	consolcont
+		cmp	oldconsol
+		bne	consolchk 
+		dec	KRPDEL
+		bne	checkskip
+consolchk
+		mvy #5 KRPDEL
+consolcont
+		sta	oldconsol
+		cmp	#$05
+		beq	NEXT
+		cmp	#$03
+		beq	PREV
+		cmp	#$06
+		beq	CLICK
+checkskip
+		lda	PORTA
 		:4 lsr
-		and PORTA
-		and #$f
+		and	PORTA
+		and	#$f
+		cmp	#$f
+		beq	joycont
+		cmp	oldjoy
+		bne	joycheck
+		dec	KRPDEL
+		bne	joyskip
+joycheck
+		mvy	#5 KRPDEL
+joycont
+		sta	oldjoy
 
 		cmp #$D
 		beq NEXT
@@ -698,6 +709,7 @@ JOYS	lda CONSOL
 		beq DOWN
 		cmp #$7
 		beq UP
+joyskip
 		lda TRIG0
 		and TRIG1
 		beq CLICK
@@ -708,17 +720,30 @@ JOYS	lda CONSOL
 		;-------
 		; Down - page next
 DOWN
+		
 		dec	PAGE
-		dec	PAGE
+		bpl	@+
+		inc	PAGE
+@		bpl	jmp
 		;-------
 		; Up - page prev
 UP
-		inc	PAGE
 @		lda	PAGE
-		and	#3
-		sta	PAGE
+		:5 asl
+		tax
+		lda	screen_data+32,x
+		beq	jmp
+		inc	PAGE
+jmp
+		lda	PAGE
 		jmp	setScreen
 
+		;--------	
+		; Click
+CLICK	asl	TMP
+		sec
+		ror	TMP
+		rts
 		;--------	
 		; Next
 NEXT	lda TMP+1
@@ -727,7 +752,7 @@ NEXT	lda TMP+1
 		inc TMP
 		ldx TMP
 		dex 
-		cpx CNT
+		cpx #26 ; was CNT
 		bne @+
 		lda #$01
 		sta TMP
@@ -741,15 +766,10 @@ PREV	lda TMP+1
 		beq PRLAST
 		dec TMP
 		bne @+
-PRLAST	ldx CNT
+PRLAST	ldx #26	; was CNT
 		stx TMP
 @		rts		
-		;--------	
-		; Click
-CLICK	lda TMP
-		ora #$80
-		sta TMP
-@		rts
+PAGES		dta	0,26,52,78
 setScreen
 		ldy	VCOUNT
 		cpy	#20
