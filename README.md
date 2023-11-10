@@ -60,5 +60,5 @@ Optionally go to the "tools" tirectory and type "make" to build homesoft atr con
 
 Authors:
 
-The main author of basic functionality:GienekP
+The main author of main functionality: menu, xex reading - GienekP
 The add-ons: cmdline arguments, optimization, compression, cartridge handling and 4-page navigation - Jakub Husak
