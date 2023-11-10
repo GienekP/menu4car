@@ -41,6 +41,9 @@ or
 
 If a parameter is specified more than once, the last is active.
 
+## Binaries
+
+Binaries are in "Releases" tab.
 
 ## Build the executables:
 
