@@ -58,7 +58,8 @@ Then type "make" to make dependences (apultra library) and the menu4car itself.
 
 Optionally go to the "tools" tirectory and type "make" to build homesoft atr converter tool. This tool outputs all the games and corresponding txt file with file list.
 
-Authors:
+## Authors:
 
 The main author of main functionality: menu, xex reading - GienekP
+
 The add-ons: cmdline arguments, optimization, compression, cartridge handling and 4-page navigation - Jakub Husak
