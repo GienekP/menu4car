@@ -1,0 +1,11 @@
+#define         FINISH_PROCESS_JMP         0x2000
+#define         MAIN_PROCESS_JMP         0x2003
+#define         STARTFLASHWRITE 0x2006
+#define         TITLE         0x0020
+#define         CARTSIZE1 0x0078
+#define         CARTSIZE2 0x009E
+#define         TWO_CHIPS_SWITCH         0x0208
+#define         TWO_CHIPS_SWITCH_ADDR         0x2202
+#define         END_OF_MAIN_CODE         0x0AAE
+#define         BLK_BANKNUM 0x0004
+#define         BLK_SOURCE 0x0009

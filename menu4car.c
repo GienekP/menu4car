@@ -15,7 +15,6 @@
 /*--------------------------------------------------------------------*/
 typedef unsigned char U8;
 /*--------------------------------------------------------------------*/
-#define CARMAX (1024*1024)
 #define FLASHMAX (2*512*1024)
 #define BANKSIZE (0x2000)
 #define PATHLEN (0x400)
@@ -37,15 +36,19 @@ typedef unsigned char U8;
 
 // provided from .asm mads compile
 #include "menu4car_interface.h"
+#include "flashgenerator/flashgenerator.h"
+#include "flashgenerator/menu4car_templateflasher.h"
 /*--------------------------------------------------------------------*/
 #include "menu4car.h"
 #include "apultra/src/libapultra.h"
 /*--------------------------------------------------------------------*/
 int do_compress=1;
 int be_verbose=0;
-int errornumbers=0;
+int errorcounter=0;
+int skipcounter=0;
 int do_bin_output=0;
 int default_do_compress=-1;
+int cartsizetab[]={32,64,128,256,512,1024};
 /*--------------------------------------------------------------------*/
 U8 ATASCII2Internal(U8 a)
 {
@@ -145,7 +148,7 @@ void fillATASCII(U8 *txt, const U8 *name, unsigned int limit)
 }
 /*--------------------------------------------------------------------*/
 #define DAOFFS(i,f) (DATAARRAY_OFFSET+(i)+(f)*MAX_ENTRIES_1)
-#define GETADDR(_data,_pos)	(((_data[DAOFFS(_pos,1)])*BANKSIZE)|(((_data[DAOFFS(_pos,3)]<<8)|_data[DAOFFS(_pos,2)])&0x1FFF));
+#define GETADDR(_data,_pos)	(((_data[DAOFFS(_pos,1)])*BANKSIZE)|(((_data[DAOFFS(_pos,3)]<<8)|_data[DAOFFS(_pos,2)])&0x1FFF))
 #define GETBANK(_data,_pos)	(_data[DAOFFS(_pos,1)])
 #define GETCMPR(_data,_pos)	(_data[DAOFFS(_pos,0)]&0x70)
 #define GETTYPE(_data,_pos)	(_data[DAOFFS(_pos,0)]&0x7)
@@ -181,7 +184,7 @@ void outTable(U8 * data) {
 }
 
 /*--------------------------------------------------------------------*/
-void getRoomFor8kBCart(U8 * data,int start,int ipos, const U8 * cbuf)
+int getRoomFor8kBCart(U8 * data,int carsize, int start,int ipos, const U8 * cbuf)
 {
 	// 1. move data one bank up.
 	// get start addr
@@ -192,8 +195,10 @@ void getRoomFor8kBCart(U8 * data,int start,int ipos, const U8 * cbuf)
 	while (i<MAX_ENTRIES){
 		if (IS_LAST(data,i)) {
 			stop=GETADDR(data,i);
-			//printf("Found end at pos %d, value: %06x\n",i,stop);
-			break;
+			if (be_verbose>=2) {
+				printf("Found end at pos %d, value: %06x\n",i,stop);
+				break;
+			}
 		}
 		i++;
 	}
@@ -201,16 +206,22 @@ void getRoomFor8kBCart(U8 * data,int start,int ipos, const U8 * cbuf)
 	// now copy data 8kB up
 	//if (stop==0) stop=start;
 	//printf("Moving 8kB to free place for cart, size: %04x, %06x-%06x to %06x-%06x\n",stop-start,start,stop,start+0x2000,stop+0x2000);
+	//outTable(data);
+	i=0;
+	if (stop>carsize-0x2000) {
+		return 1; // no room, return with error
+	}
+	printf("Cart image stored at: %06x\n",start);
+
 	for (int k=stop-1; k>=start; k--) {
 		data[k+0x2000]=data[k];
 		data[k]=0;
 		//printf("%06x ",k);
 	}
-	//printf("Store cart: %06x\n",start);
 	for (i=0; i<0x2000; i++) {data[start+i]=cbuf[i];};
 
 	// also moving entries and store under current
-	i=103;
+	i=MAX_ENTRIES-1;
 	while (i>=ipos) {
 		for (int j=0; j<5; j++)
 			data[DAOFFS(i+1,j)]=data[DAOFFS(i,j)];
@@ -218,16 +229,16 @@ void getRoomFor8kBCart(U8 * data,int start,int ipos, const U8 * cbuf)
 	}
 
 	i=0;
-	// 2. update pos chain by adding 1 to bank
+	// 2. update pos chain by adding 1 to banks of not carts
 	while (i<MAX_ENTRIES_1)
 	{
-			
 		if (GETTYPE(data,i)!=TYPE_CAR)
 			GETBANK(data,i)++; // inc bank and mark free 8kB
 
 		if (IS_LAST(data,i)) break;
 		i++;
 	}
+	return 0; // ok.
 }
 /*--------------------------------------------------------------------*/
 unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigned int pos,
@@ -236,7 +247,7 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 	unsigned int i,ret=0;
 	unsigned int start,stop;
 	int SC_POS_OFFSET=SCREENDATA_OFFSET+32*pos;
-	//int DA_POS_OFFSET=DATAARRAY_OFFSET+pos;
+
 	if (pos==0) 
 	{	// init first entry as end marker
 		SETDATA(data,pos,0x80,1,0x0000,0);
@@ -244,7 +255,9 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 		
 	start=GETADDR(data,pos);
 	stop=(start+size);
-	//printf("Start: %06x, stop: %06x\n",start,stop);
+	if (be_verbose>=2)
+		printf("Pos: %d, file start: %06x, stop: %06x\n",pos,start,stop);
+
 	if (stop<=carsize) {// if fits
 
 
@@ -266,11 +279,18 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 			//printf("lcartpos: %d lcartbank: %d lcartstart: %06x\n",lcartpos,lcartbank,lcartstart);
 			//outTable(data);
 
-			getRoomFor8kBCart(data,lcartstart,lcartbank,buf);
-
-			SETDATA(data,lcartbank,flags&0x7f,lcartbank+1,lcartstart,pos);
-			//move last entry one pos up
-			SETDATA(data,pos+1,0x80,((stop/BANKSIZE)&0x7F),stop,0);
+			if (0==getRoomFor8kBCart(data,carsize,lcartstart,lcartbank,buf))
+			{
+				SETDATA(data,lcartbank,flags&0x7f,lcartbank+1,lcartstart,pos);
+				//move last entry one pos up
+				SETDATA(data,pos+1,0x80,((stop/BANKSIZE)&0x7F),stop,0);
+			}
+			else {
+				printf("Cart image '%s' not added due to insufficient room.\n",name);
+				skipcounter++;
+				ret=stop-carsize;
+				stop=start;
+			}
 		}
 		else 
 		{
@@ -290,12 +310,16 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 	}
 	else
 	{
+		printf("File '%s' not added due to insufficient room.\n",name);
+		skipcounter++;
 		ret=stop-carsize;
 		stop=start;
 	}
 
-	if (be_verbose)
-		printf("Added, length %d.\n",size);
+	//
+	if (!ret)
+		if (be_verbose>=2)
+			printf("Added, length %d.\n",size);
 	return ret;
 }
 /*--------------------------------------------------------------------*/
@@ -313,7 +337,7 @@ unsigned int loadFile(const char *path, U8 *buf, unsigned int sizebuf)
 	else
 	{
 		fprintf(stderr,"Load Error \"%s\".\n",path);
-		errornumbers++;
+		errorcounter++;
 	};
 	return size;
 }
@@ -504,7 +528,8 @@ static unsigned int pos=0;
 		if (be_verbose) {
 			printf("SUMMARY:\n");
 			printf("Processed %d file entries.\n",pos);
-			printf("Spotted %d errors.\n",errornumbers);
+			printf("Spotted %d errors.\n",errorcounter);
+			printf("Skipped %d files.\n",skipcounter);
 			if (default_do_compress!=0) {
 				printf("Cartridge size: %d/0x%06x\n",carsize,carsize);
 				printf("Cartridge data section size: %d/%06x\n",carsize-BANKSIZE,carsize-BANKSIZE);
@@ -513,6 +538,7 @@ static unsigned int pos=0;
 				printf("Compression ratio: %d%%\n",osize*100/ncsize);
 			}
 			printf("Cartridge fill: %d%%\n",((osize+1)*200)/(2*(carsize-BANKSIZE)));
+			printf("Free Bytes left: %d%\n",carsize-BANKSIZE-osize);
 		}
 		return 0;
 	}
@@ -524,9 +550,11 @@ static unsigned int pos=0;
 	{
 		unsigned int size=loadFile(path,buf,sizeof(buf)-BANKSIZE-6);
 		if (be_verbose)
-			printf("File loaded %s, length: %d... ",path,size);
+			printf("File loaded %s, length: %d ",path,size);
 		int filetype=checkTypeByPath(path);
 		if (filetype==TYPE_XEX) {
+			if (be_verbose)
+				printf("type XEX... ");
 			size=repairFile(buf,size);
 			// compress file, get new size.
 			if (size) {
@@ -574,73 +602,70 @@ static unsigned int pos=0;
 				}
 
 				//saveRAW(buf,size);
+				int over=0;
+				int incrsize=0;
 				if (do_compress && ((comprsize < size) || do_compress>=1)) // forced 
 				{
-
 					flags|=((choosen_compress_method)<<4);
-					unsigned int over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags);
-					advance=1;
-					if (over) {
-						if (be_verbose)
-							printf("ERROR: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
-					}
-					else {
-						if (be_verbose)
-							printf("Compressed, method %d, length (compr/uncompr): %d/%d, ratio %d%%\n",choosen_compress_method,comprsize,size,comprsize*100/size);
-						osize+=comprsize;
-						ncsize+=size;
-					}
-
-
+					over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags);
+					incrsize=comprsize;
 				}
 				else if ((comprsize >= size)||!do_compress)
 				{
-					unsigned int over=insertPos(name,data,carsize,pos,buf,size,flags);
-					advance=1;
-					if (over) {
-						if (be_verbose)
-							printf("ERROR: \"%s\", does not fit, need %i bytes.\n",name,over); advance=0;
-					}
-					else	{
-						if (be_verbose)
-							printf("Added without compression.\n");
-						osize+=size;
-						ncsize+=size;
-					}
+					over=insertPos(name,data,carsize,pos,buf,size,flags);
+					incrsize=size;
 				}
-				//else
-				//{clearPos(data,pos);};
+
+				if (over) {
+					if (be_verbose)
+						printf("SKIPPED: \"%s\", does not fit, need %i bytes.\n",name,over);
+				}
+				else {
+					if (be_verbose) {
+						if (incrsize==size)
+							printf("Added, length: %d\n",incrsize);
+						else
+							printf("Compressed with method %d, length (compr/uncompr): %d/%d, ratio %d%%\n",choosen_compress_method,comprsize,size,comprsize*100/size);
+					}
+					osize+=incrsize;
+					ncsize+=size;
+					advance=1;
+				}
 			}
 		}
 		else if (filetype==TYPE_CAR)
 		{
+			if (be_verbose)
+				printf("type CAR... ");
 			switch (size){
 				case 0x410:
 						for (int i=0x10; i<0x410; i++) {buf[0x400+i]=buf[i];};
 						size+=0x400;
-						osize+=size&0xfc10;
-						ncsize+=size&0xfc10;
+						// no break;
 				case (0x810):
 						for (int i=0x10; i<0x810; i++) {buf[0x800+i]=buf[i];};
 						size+=0x800;
-						osize+=size&0xfc10;
-						ncsize+=size&0xfc10;
+						// no break;
 				case (0x1010):
 						for (int i=0x10; i<0x1010; i++) {buf[0x1000+i]=buf[i];};
 						size+=0x1000;
-						osize+=size&0xfc10;
-						ncsize+=size&0xfc10;
+						// no break;
 				case (0x2010):
 						{
 							unsigned int over=insertPos(name,data,carsize,pos,&buf[16],0x2000,flags);
-							osize+=size&0xf800;
-							ncsize+=size&0xf800;
-							advance=1;
+							if (over){
+								if (be_verbose)
+									printf("SKIPPED: \"%s\", does not fit, need %i bytes.\n",name,over);
+							} else {
+								osize+=size&0xf800;
+								ncsize+=size&0xf800;
+								advance=1;
+							}
 						}
 						break;
 				default:
 						printf("ERROR: \"%s\", only <=8k cartridges are handled (size: %04x)\n",name,size);
-						errornumbers++;
+						errorcounter++;
 			}
 		}
 	}
@@ -737,7 +762,7 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 		{
 			U8 status=readLine(pf,name,path,addparams);
 			if (strlen(path)>0 && strlen(name)>0) {
-				if (be_verbose)
+				if (be_verbose>=2)
 					printf("Line read num: %d, '%s','%s','%s'\n",i,name,path,addparams);
 				if (name[0]=='#')
 					continue;
@@ -748,11 +773,13 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 			else
 				break;
 		};
+		// output summary info
 		addPos(0,carsize,0,0,0,0);
 		for (i=0; i<MAX_ENTRIES+1; i++)
 		{
 			int DA_POS_OFFSET=DATAARRAY_OFFSET+i;
-			if (data[DA_POS_OFFSET]!=0xFF) {data[DA_POS_OFFSET+3*MAX_ENTRIES_1]+=0xA0;};
+			// update hi byte of every entry
+			if (data[DA_POS_OFFSET]!=0xFF) {data[DA_POS_OFFSET+3*MAX_ENTRIES_1]|=0xA0;};
 		};
 		fclose(pf);
 	}
@@ -761,8 +788,9 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 		fprintf(stderr,"Open Error \"%s\".\n",filemenu);
 	};
 };
+#define ERROR(str) {fprintf(stderr,str); exit(1);}
 /*--------------------------------------------------------------------*/
-U8 saveCAR(const char *filename, U8 *data, unsigned int carsize)
+U8 saveCAR(const char *filename, U8 *data, unsigned int carsize, unsigned int phys_carsize)
 {
 	U8 header[16]={0x43, 0x41, 0x52, 0x54, 0x00, 0x00, 0x00, 0x2A,
 		           0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00};
@@ -776,56 +804,122 @@ U8 saveCAR(const char *filename, U8 *data, unsigned int carsize)
 	U8 ret=0;
 	unsigned int i,j,sum=0;
 	FILE *pf;
-	if (output_type==TYPE_CAR) {
-		for (i=0; i<carsize; i++) { sum+=data[i];};
-		header[8]=((sum>>24)&0xFF);
-		header[9]=((sum>>16)&0xFF);
-		header[10]=((sum>>8)&0xFF);
-		header[11]=(sum&0xFF);
-		if (be_verbose)
-			printf("Cartridge Checksum: %02x%02x%02x%02x\n",header[8],header[9],header[10],header[11]);
-	}
-
-	if (output_type==TYPE_UNKNOWN) {
-		fprintf(stderr,"Error: -o provided filename has unknown extension (possible are .car, .bin and .xex). No output generated.\n");
-		return 0;
-	}
-
-	if (output_type==TYPE_XEX) {
-		fprintf(stderr,"Error: XEX write not implemented yet. No output generated.\n");
-		return 0;
-	}
-
-	pf=fopen(filename,"wb");
-	if (pf)
-	{
-		j=0;
+	if (output_type == TYPE_CAR || output_type==TYPE_BIN ) {
 		if (output_type==TYPE_CAR) {
-			j=fwrite(header,sizeof(U8),16,pf);
-			if (j!=16)
-				fprintf(stderr,"Error: Cartridge image '%s' truncated (%d bytes written)\n",filename, j);
+			for (i=0; i<phys_carsize; i++) { sum+=data[i];};
+			header[8]=((sum>>24)&0xFF);
+			header[9]=((sum>>16)&0xFF);
+			header[10]=((sum>>8)&0xFF);
+			header[11]=(sum&0xFF);
+			if (be_verbose)
+				printf("Cartridge Checksum: %02x%02x%02x%02x\n",header[8],header[9],header[10],header[11]);
 		}
 
-		if (j==16 || output_type==TYPE_CAR || output_type==TYPE_BIN )
-		{
-			i=fwrite(data,sizeof(U8),carsize,pf);
-			if (i==carsize) {
-				if (be_verbose)
-					printf("Cartridge image '%s' saved (%d bytes)\n",filename, i+j);
-				ret=1;
-				}
-			else
-			{
-				fprintf(stderr,"Error: Cartridge image '%s' truncated (%d bytes written)\n",filename, i+j);
+		pf=fopen(filename,"wb");
 
+		if (pf)
+		{
+			j=0;
+			if (output_type==TYPE_CAR) {
+				j=fwrite(header,sizeof(U8),16,pf);
+				if (j!=16)
+					fprintf(stderr,"Error: Cartridge image '%s' truncated (%d bytes written)\n",filename, j);
 			}
 
-		};
-		fclose(pf);
+			if (j==16)
+			{
+				i=fwrite(data,sizeof(U8),phys_carsize,pf);
+				if (i==phys_carsize) {
+					if (be_verbose)
+						printf("Cartridge image '%s' saved (%d bytes)\n",filename, i+j);
+					ret=1;
+				}
+				else
+				{
+					fprintf(stderr,"Error: Cartridge image '%s' truncated (%d bytes written)\n",filename, i+j);
+				}
+
+			};
+			fclose(pf);
+		}
+		else {
+			fprintf(stderr,"Error opening file '%s': %s \n",filename, strerror(errno));
+			fprintf(stderr,"Cartridge image file write failed.\n");
+		}
+
 	}
-	else {
-		fprintf(stderr,"Error opening file '%s': %s \n",filename, strerror(errno));
-		fprintf(stderr,"Cartridge image file write failed.\n");
+	else if (output_type==TYPE_XEX)
+	{
+		pf=fopen(filename,"wb");
+		//FILE * pft=fopen("testoutput.bin","wb");
+		if (pf)
+		{
+			// change some places in template
+			// change chipnum
+			menu4car_templateflasher_xex[TWO_CHIPS_SWITCH]=carsize>0x80000;
+			// change cartsizes in two places
+			char test[10];
+			sprintf(test,"%5d",carsize/1024);
+			for(int i=0; i<5; i++) {
+				menu4car_templateflasher_xex[CARTSIZE1+i]=
+					menu4car_templateflasher_xex[CARTSIZE2+i]=
+					test[i]+0x80;
+
+			}
+			if (carsize/1024<1024) {
+				menu4car_templateflasher_xex[CARTSIZE2]='>'+0x80;
+				menu4car_templateflasher_xex[CARTSIZE2+1]='='+0x80;
+			}
+
+			// write head part with strings converted
+			// change strings
+			if (END_OF_MAIN_CODE!=fwrite(menu4car_templateflasher_xex,sizeof(U8),END_OF_MAIN_CODE,pf)) ERROR("Error writing file\n");
+			
+			// write blocks of data - as many as needed.
+			for (int bank=0; bank<(phys_carsize/BANKSIZE); bank++) {
+				int start=-1;
+				int stop=0;
+				for (int j=bank*BANKSIZE; j<(bank+1)*BANKSIZE; j++)
+				{
+					if (start==-1 && data[j]!=0xff) {
+						start=j-bank*BANKSIZE;
+					}
+					if (data[j]!=0xff) stop=j-bank*BANKSIZE;
+				}
+				if (start==-1) continue; // empty bank
+				//printf("Save bank: %06x\n",j);
+				// write bank section
+				U8 setbank[] = {0x88, 0x00, 0x88, 0x00, 0x00 };
+				setbank[4]=bank;
+				if (sizeof(setbank)!=fwrite(setbank,sizeof(U8),sizeof(setbank),pf)) ERROR("Error writing file\n");
+				// write load address
+				int istart=start+0x6000;
+				int istop=stop+0x6000;
+				U8 banksection[4];
+				banksection[0]=istart&0xff;
+				banksection[1]=istart>>8;
+				banksection[2]=istop&0xff;
+				banksection[3]=istop>>8;
+				if (sizeof(banksection)!=fwrite(banksection,sizeof(U8),sizeof(banksection),pf)) ERROR("Error writing file\n");
+				// write data itself
+				if (stop-start+1!=fwrite(&data[bank*BANKSIZE+start],sizeof(U8),stop-start+1,pf)) ERROR("Error writing file\n");
+				//if (0x2000!=fwrite(&data[bank*BANKSIZE],sizeof(U8),0x2000,pft)) ERROR("Error writing file\n");
+				// write init address
+				U8 bankend[] = {0xe2,0x02,0xe3,0x02,MAIN_PROCESS_JMP&0xff,MAIN_PROCESS_JMP>>8};
+				if (sizeof(bankend)!=fwrite(bankend,sizeof(U8),sizeof(bankend),pf)) ERROR("Error writing file\n");
+			}
+
+			U8 fileend[] = {0xe2,0x02,0xe3,0x02,FINISH_PROCESS_JMP&0xff,FINISH_PROCESS_JMP>>8};
+			if (sizeof(fileend)!=fwrite(fileend,sizeof(U8),sizeof(fileend),pf)) ERROR("Error writing file\n");
+
+		fclose(pf);
+		//fclose(pft);
+		}
+	}
+	else
+	{
+		fprintf(stderr,"Error: -o provided filename has unsupported extension (possible are .car, .bin and .xex). No output generated.\n");
+		return 0;
 	}
 
 	return ret;
@@ -901,6 +995,7 @@ void addPages(U8* data)
 	}
 
 	int pages=i/26;
+	data[FILL_PAGES_OFFSET+4]=pages;
 
 	if (pages>=1)
 		for (int page=0; page<=pages; page++)
@@ -914,17 +1009,17 @@ void addPages(U8* data)
 }
 
 /*--------------------------------------------------------------------*/
-void menu4car(const char * filemenu, const char * logo, const char * colortablefile, const char * fontpath, const char * carname, int cart_size, int default_do_compress)
+void menu4car(const char * filemenu, const char * logo, const char * colortablefile, const char * fontpath, const char * carname, int cart_size, int cart_size_physical, int default_do_compress)
 {
-	U8 cardata[CARMAX];
-	fillData(cardata, CARMAX, 0xFF);
-	addMenu(cardata,CARMAX,menu4car_bin,menu4car_bin_len,19);
+	U8 cardata[FLASHMAX];
+	fillData(cardata, FLASHMAX, 0xFF);
+	addMenu(cardata,FLASHMAX,menu4car_bin,menu4car_bin_len,19);
 	addLogo(cardata,logo,256*16,8);
 	addCTable(cardata,colortablefile);
 	addFont(cardata,fontpath);
 	addData(cardata,cart_size,filemenu);
 	addPages(cardata);
-	saveCAR(carname,cardata,FLASHMAX);
+	saveCAR(carname,cardata,cart_size,cart_size_physical);
 }
 void usage() {
 		printf("Menu4CAR - ver: %s\n",__DATE__);
@@ -933,10 +1028,11 @@ void usage() {
 		printf("\nOptions:\n");
 		printf("	-p <path> - picdata path (default Menu4Car, built in)\n");
 		printf("	-t <path> - color table path (default rainbow, built in)\n");
-		printf("	-o <path> - outputcar path (filetype: <>.car, <>.bin or <>.exe\n");
+		printf("	-o <path> - outputcar path (filetype: <>.car, <>.bin or <>.exe or <>.xex\n");
 		printf("	-c <compression> - forced compression method 0/1/2/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
 		printf("	-f <path> - font path\n");
-		printf("	-s <size> - cart size: 32/64/128/256/512/1024, default 1024\n");
+		printf("	-s <size> - logical cart size: 32/64/128/256/512/1024, default 1024\n");
+		printf("	-S <size> - physical cart size: 32/64/128/256/512/1024, default as logical; if set must be after -s\n");
 		printf("	-v - be verbose\n");
 		printf("	-? - this help\n\n");
 		exit(EX_USAGE);
@@ -954,6 +1050,7 @@ int main( int argc, char* argv[] )
 	char * outfile=NULL;
 	char * fontpath=NULL;
 	int  cart_size=1024*1024;
+	int  cart_size_physical=1024*1024;
 	char * txtfilename=NULL;
 	int i;
 
@@ -961,10 +1058,11 @@ int main( int argc, char* argv[] )
 	while (i<argc)
 	{
 		if (argv[i][0]=='-') {
-			if  (strlen(argv[i])==2) {
+			if  (strlen(argv[i])>=2) {
 				int has_val=i<(argc-1);
 				//printf("arg: %c\n",argv[i][1]);
-				switch (argv[i][1]) {
+				int actualswitch=argv[i][1];
+				switch (actualswitch) {
 					case 'p':
 						if (has_val)
 							logofilepath=argv[++i];
@@ -1013,17 +1111,24 @@ int main( int argc, char* argv[] )
 						//printf("Font path: %s\n",fontpath);
 
 						break;
+					case 'S':
 					case 's':
 						if (has_val) {
 							int s;
 							i++;
-							int tab[]={32,64,128,256,512,1024};
-							for (s=0; s<6; s++){
+							for (s=0; s<sizeof(cartsizetab)/sizeof(cartsizetab[0]); s++){
 								char test[10];
-								sprintf(test,"%d",tab[s]);
+								sprintf(test,"%d",cartsizetab[s]);
 
 								if (strcmp(test,argv[i])==0) {
-									cart_size=strtol(argv[i],NULL,10)*1024;
+									int cs=strtol(argv[i],NULL,10)*1024;
+
+									if (actualswitch=='S')
+										cart_size_physical=cs;
+									if (actualswitch=='s') {
+										cart_size=cs;
+										cart_size_physical=cs;
+									}
 									//printf("Cart size: %d\n",cart_size);
 									break;
 								}
@@ -1035,7 +1140,9 @@ int main( int argc, char* argv[] )
 						break;
 
 					case 'v': 
-						be_verbose=1;
+						be_verbose=strrchr(argv[i],'v')-argv[i];
+						printf("verbose=%d\n",be_verbose);
+						
 						break;
 					default:
 						usage();
@@ -1051,9 +1158,9 @@ int main( int argc, char* argv[] )
 	}
 
 	if (txtfilename)
-		menu4car(txtfilename,logofilepath, colortablefile, fontpath, outfile, cart_size, default_do_compress);
-	if (errornumbers>0)
-		fprintf(stderr,"Warning: %d input file errors encountered.\n",errornumbers);
+		menu4car(txtfilename,logofilepath, colortablefile, fontpath, outfile, cart_size, cart_size_physical, default_do_compress);
+	if (errorcounter>0)
+		fprintf(stderr,"Warning: %d input file errors encountered.\n",errorcounter);
 
 	return 0;
 }

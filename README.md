@@ -29,7 +29,12 @@ When file .txt is ready, invoke:
 
     ./menu4car menu4car.txt -o outcartimage.car
 
-Then outcartimage.car is a cart image MAXFLASH (type 42) compatible.
+then outcartimage.car is a cart image MAXFLASH (type 42) compatible.
+
+    ./menu4car menu4car.txt -o outcartimage.xex
+
+and outcartimage.xex is a flasher application ready to be placed on the media readable by real Atari. The file size nay exceed 1 MB, so floppy disk is too small.
+
 
 Full list of parameteres:
 

@@ -680,7 +680,7 @@ consolchk
 consolcont
 		sta	oldconsol
 		cmp	#$05
-		beq	NEXT
+		jeq	NEXT
 		cmp	#$03
 		jeq	UP
 		cmp	#$06
@@ -720,11 +720,14 @@ joyskip
 		;-------
 		; Down - page next
 DOWN
-		
+		ldx	PAGE
+		beq	@+
 		dec	PAGE
-		bpl	@+
-		inc	PAGE
-@		bpl	jmp
+		lda	PAGE
+		jmp	setScreen
+@		lda	NUMPAGES
+		sta	PAGE
+		jmp	setScreen
 		;-------
 		; Up - page prev
 UP
@@ -763,7 +766,7 @@ NEXT		ldy PAGE
 @		rts
 		;--------	
 		; Previous
-PREV	lda TMP+1
+PREV		lda TMP+1
 		bne @+
 		inc TMP+1
 		lda TMP
@@ -778,6 +781,8 @@ PRLAST		ldy PAGE
 PAGES		dta	0,26,52,78
 		.print "#define	FILL_PAGES_OFFSET	0x",*-$a000
 FILLPAGES	dta	0,0,0,0
+NUMPAGES	dta	0
+
 setScreen
 		ldy	VCOUNT
 		cpy	#20
