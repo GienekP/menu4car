@@ -1,10 +1,11 @@
 # MENU2CAR
 
 This utility let's you create a MaxFlash/JCart cart image with your favourite Atari 8-bit games.
+Also, XEX flasher ready to write do some media may be created. No more additional tools!
 
-File types handled:
+Input file types handled:
 - standard Atari Dos binary (extensions: .exe, .xex, .obj, .com eithercase)
-- 1kB, 2kB, 4kB 8kB .car standard cartridge image files (extension: .car eithercase)
+- 1kB, 2kB, 4kB or 8kB .car standard cartridge image files (extension: .car eithercase)
 
 The example file menu4car.txt contains an input in form of sort of csv file, separated by "|" char. It is an UTF-8 encoded file with Polish diacritical letters handling as well as some German letters too.
 
@@ -33,7 +34,7 @@ then outcartimage.car is a cart image MAXFLASH (type 42) compatible.
 
     ./menu4car menu4car.txt -o outcartimage.xex
 
-and outcartimage.xex is a flasher application ready to be placed on the media readable by real Atari. The file size nay exceed 1 MB, so floppy disk is too small.
+and outcartimage.xex is a flasher application ready to be placed on the media readable by real Atari. The file size nay exceed 1 MB, so floppy disk may too small for cartridge images filled up more than disk size.
 
 
 Full list of parameteres:
@@ -44,7 +45,7 @@ or
 
     ./menu4car -?
 
-If a parameter is specified more than once, the last is active.
+If a parameter is specified more than once, the last is active. Parameter '-S' if given must be after '-s'.
 
 ## Binaries
 
