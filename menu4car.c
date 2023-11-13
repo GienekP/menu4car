@@ -538,7 +538,7 @@ static unsigned int pos=0;
 				printf("Compression ratio: %d%%\n",osize*100/ncsize);
 			}
 			printf("Cartridge fill: %d%%\n",((osize+1)*200)/(2*(carsize-BANKSIZE)));
-			printf("Free Bytes left: %d%\n",carsize-BANKSIZE-osize);
+			printf("Free Bytes left: %d\n",carsize-BANKSIZE-osize);
 		}
 		return 0;
 	}
