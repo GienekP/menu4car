@@ -342,7 +342,7 @@ unsigned int loadFile(const char *path, U8 *buf, unsigned int sizebuf)
 	return size;
 }
 /*--------------------------------------------------------------------*/
-
+/*
 void saveRAW(U8 *raw, unsigned int size)
 {
 	static int licz=0;
@@ -353,7 +353,7 @@ void saveRAW(U8 *raw, unsigned int size)
 	fwrite(raw,1,size,pf);
 	fclose(pf);
 };
-
+*/
 /*--------------------------------------------------------------------*/
 unsigned int repairFile(U8 *buf, unsigned int size)
 {
@@ -601,7 +601,7 @@ static unsigned int pos=0;
 					}
 				}
 
-				saveRAW(buf,size);
+				//saveRAW(buf,size);
 				int over=0;
 				int incrsize=0;
 				if (do_compress && ((comprsize < size) || do_compress>=1)) // forced 
