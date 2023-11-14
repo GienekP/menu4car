@@ -2,9 +2,9 @@ CC = gcc
 MAIN = menu4car
 LFLAGS=apultra/libapultra.a -Lapultra -lapultra $(ARCH)
 CFLAGS=-c -O3 -g -fomit-frame-pointer -Iapultra/src/libdivsufsort/include -Iapultra/src $(ARCH)
-SYSTEM = $(shell uname -s)
+SYSTEM = $(shell uname -s -m)
 
-ifeq ($(SYSTEM)$(ARCH),Darwin)
+ifeq ($(SYSTEM)$(ARCH),Darwin arm64)
 MNAME = $(shell uname -m)
 $(MAIN): $(MAIN).x86_64 $(MAIN).arm64
 	lipo -create -output $@ $^
