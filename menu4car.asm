@@ -420,16 +420,15 @@ BEGIN
 		lda #$21
 		sta DMACTLS
 		
-		lda DLPTRS
-		pha
-
 		ldx #31
 @		lda ramantic-1,x
 		sta $105,x
 		dex
 		bne @-
-		stx PAGE
+		stx PAGE ; <-0
 	
+		lda DLPTRS
+		pha
 		lda #<antic
 		sta DLPTRS
 		lda DLPTRS+1
