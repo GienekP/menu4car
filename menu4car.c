@@ -1026,11 +1026,11 @@ void usage() {
 		printf("(c) GienekP\n\n");
 		printf("usage:\nmenu4car menu.txt <options>\n");
 		printf("\nOptions:\n");
-		printf("	-p <path> - picdata path (default Menu4Car, built in)\n");
-		printf("	-t <path> - color table path (default rainbow, built in)\n");
+		printf("	-p <path> - picdata path (default Menu4Car, built in), raw 8-bit b&w 512 byte length\n");
+		printf("	-t <path> - color table path (default rainbow, built in), 16 byte length of atari colors\n");
 		printf("	-o <path> - outputcar path (filetype: <>.car, <>.bin or <>.exe or <>.xex\n");
 		printf("	-c <compression> - forced compression method 0/1/2/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
-		printf("	-f <path> - font path\n");
+		printf("	-f <path> - path to 1024 byte length font file\n");
 		printf("	-s <size> - logical cart size: 32/64/128/256/512/1024, default 1024\n");
 		printf("	-S <size> - physical cart size: 32/64/128/256/512/1024, default as logical; if set must be after -s\n");
 		printf("	-v - be verbose\n");
