@@ -4,38 +4,40 @@
 ; (c) 2023 GienekP
 ;
 ;-----------------------------------------------------------------------
+BASEE	= $200
+INITX	= <(BASEE-$101)
 ALLOC	= ($1e+$c)
-BANK    = ($0200-(DTACPYE-GETBYTE)+1)
-SRC     = ($0200-(DTACPYE-ADRSRC)+1)
-RSRC    = ($0200-(DTACPYE-ADRRSRC)+1)
-DST     = ($0200-(DTACPYE-ADRDST)+1)
+BANK    = (BASEE-(DTACPYE-GETBYTE)+1)
+SRC     = (BASEE-(DTACPYE-ADRSRC)+1)
+RSRC    = (BASEE-(DTACPYE-ADRRSRC)+1)
+DST     = (BASEE-(DTACPYE-ADRDST)+1)
 
-CBUFFER = ($0200-(DTA256CPYE-CYCL256)+1)
-CBUFSRC = ($0200-(DTA256CPYE-SRCP256)+1)
+CBUFFER = (BASEE-(DTA256CPYE-CYCL256)+1)
+CBUFSRC = (BASEE-(DTA256CPYE-SRCP256)+1)
 
-POS     = ($200-ALLOC)
-CNT     = ($0201-ALLOC)
-nextbytevec = ($0203-ALLOC)
-yieldvec = ($0205-ALLOC)
-token	= ($0207-ALLOC)
-offsetL = ($0208-ALLOC)
-offsetH = ($0209-ALLOC)
-EBPL    = ($020a-ALLOC)
-EBPH    = ($020b-ALLOC)
-bl      = ($020c-ALLOC)
-PAGE      = ($020d-ALLOC)
-GET_FROM_CAR     = ($0200-(DTACPYE-GETBYTE))
-PUT_RAM     = ($0200-(DTACPYE-PUTBYTE))
-GET_RAM_BYTE     = ($0200-(DTACPYE-GETRBTE))
+POS     = (BASEE-ALLOC)
+CNT     = (BASEE+1-ALLOC)
+nextbytevec = (BASEE+3-ALLOC)
+yieldvec = (BASEE+5-ALLOC)
+token	= (BASEE+7-ALLOC)
+offsetL = (BASEE+8-ALLOC)
+offsetH = (BASEE+9-ALLOC)
+EBPL    = (BASEE+$a-ALLOC)
+EBPH    = (BASEE+$b-ALLOC)
+bl      = (BASEE+$c-ALLOC)
+PAGE      = (BASEE+$d-ALLOC)
+GET_FROM_CAR     = (BASEE-(DTACPYE-GETBYTE))
+PUT_RAM     = (BASEE-(DTACPYE-PUTBYTE))
+GET_RAM_BYTE     = (BASEE-(DTACPYE-GETRBTE))
 
-PUTCB	 = ($0200-(DTA256CPYE-CYCL256))
-GETSRCCB = ($0200-(DTA256CPYE-SRCP256))
+PUTCB	 = (BASEE-(DTA256CPYE-CYCL256))
+GETSRCCB = (BASEE-(DTA256CPYE-SRCP256))
 
 
-RUN     = ($0200-(ENTRYE-ADRRUN)+1)
-BACK    = ($0200-(ENTRYE-ADRBCK)+1)
-ENTRY   = ($0200-(ENTRYE-ENTRYS))
-RUNCART   = ($0200-(RUNCARTE-RUNCARTS))
+RUN     = (BASEE-(ENTRYE-ADRRUN)+1)
+BACK    = (BASEE-(ENTRYE-ADRBCK)+1)
+ENTRY   = (BASEE-(ENTRYE-ENTRYS))
+RUNCART   = (BASEE-(RUNCARTE-RUNCARTS))
 
 ;-----------------------------------------------------------------------
 
@@ -260,7 +262,7 @@ CopyCLR	ldx #(CLPRE-CLPRS-1)
 ; Copy Copy to Stack
 CopyCPY	ldx #(DTACPYE-DTACPYS)
 @		lda DTACPYS-1,X
-		sta $0200-(DTACPYE-DTACPYS+1),X
+		sta BASEE-(DTACPYE-DTACPYS+1),X
 		dex
 		bne @-
 		rts
@@ -269,7 +271,7 @@ CopyCPY	ldx #(DTACPYE-DTACPYS)
 ; Copy Copy256 to Stack
 CopyCPY256	ldx #(DTA256CPYE-DTA256CPYS)
 @		lda DTA256CPYS-1,X
-		sta $0200-(DTA256CPYE-DTA256CPYS+1),X
+		sta BASEE-(DTA256CPYE-DTA256CPYS+1),X
 		dex
 		bne @-
 		rts
@@ -397,7 +399,8 @@ KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,
 ; CART MAIN CODE
 ;
 
-BEGIN	jsr TESTSEL
+BEGIN
+		jsr TESTSEL
 		ldx #ALLOC ; several bytes on STACK for LOADER
 		lda #$EA
 @		pha
@@ -1171,14 +1174,14 @@ CmpDst	lda DST
 ; Copy Entry to Stack
 CopyENT	ldx #(ENTRYE-ENTRYS)
 @		lda ENTRYS-1,X
-		sta $0200-(ENTRYE-ENTRYS+1),X
+		sta BASEE-(ENTRYE-ENTRYS+1),X
 		dex
 		bne @-
 		rts
 ;-----------------------------------------------------------------------		
 CopyRunCart	ldx #(RUNCARTE-RUNCARTS)
 @		lda RUNCARTS-1,x
-		sta $0200-(RUNCARTE-RUNCARTS+1),X
+		sta BASEE-(RUNCARTE-RUNCARTS+1),X
 		dex
 		bne @-
 		rts
