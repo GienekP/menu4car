@@ -1,12 +1,13 @@
 ;-----------------------------------------------------------------------		
 ;
 ; Menu4car starter
-; (c) 2023 GienekP
+; (c) 2023 GienekP, jhusak
 ;
 ;-----------------------------------------------------------------------
-BASEE	= $200
-INITX	= <(BASEE-$101)
-ALLOC	= ($1e+$c)
+STORAGE = $48
+ALLOC	= ($1e+STORAGE)
+BASEE	= $780+ALLOC
+CYCLBUF	= BASEE+$80
 BANK    = (BASEE-(DTACPYE-GETBYTE)+1)
 SRC     = (BASEE-(DTACPYE-ADRSRC)+1)
 RSRC    = (BASEE-(DTACPYE-ADRRSRC)+1)
@@ -26,6 +27,14 @@ EBPL    = (BASEE+$a-ALLOC)
 EBPH    = (BASEE+$b-ALLOC)
 bl      = (BASEE+$c-ALLOC)
 PAGE      = (BASEE+$d-ALLOC)
+STORE      = (BASEE+$e-ALLOC)
+
+KRPDEL	= STORE+17
+oldconsol	= STORE+18
+oldjoy	= STORE+19
+dliram = STORE + 20
+ramcold = STORE + 20 + $20
+
 GET_FROM_CAR     = (BASEE-(DTACPYE-GETBYTE))
 PUT_RAM     = (BASEE-(DTACPYE-PUTBYTE))
 GET_RAM_BYTE     = (BASEE-(DTACPYE-GETRBTE))
@@ -67,9 +76,6 @@ COLPF1S	= $02C5
 COLPF2S	= $02C6
 COLBAKS	= $02C8
 
-KRPDEL	= $02D9
-oldconsol	= $02DA
-oldjoy	= $02DB
 INITAD  = $02E2
 RUNAD   = $02E0
 MEMTOP  = $02E5
@@ -131,11 +137,11 @@ tabpos	:+(105) dta 0
 antic	:+1 dta $60
 		dta $4F,<pic,>pic
 		:+15 dta $0F
-		dta $01,6,1 ; jump onto ram part of dli
+		dta $01,<dliram,>dliram ; jump onto ram part of dli
 		
 ;--------------------------------------------
 ramantic
-	dta	$42,0,$a0
+	dta	$42,<screen_data,>screen_data
 	:25 dta	$02
 	dta $41,<antic,>antic
 
@@ -200,9 +206,9 @@ _PUTBYTE	sta $D5FF	; entry point
 _ADRDST	sta $FFFF
 	clc
 	bcc _BACKC
-CYCL256 sta $500 ; entry point
+CYCL256 sta CYCLBUF ; entry point
 	rts
-SRCP256	lda $500 ; entry point
+SRCP256	lda CYCLBUF ; entry point
 	rts
 	nop	;IMPORTANT to get the same size as previous code section
 
@@ -401,20 +407,21 @@ KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,
 
 BEGIN
 		jsr TESTSEL
-		ldx #ALLOC ; several bytes on STACK for LOADER
-		lda #$EA
-@		pha
-		dex
-		bne @-
+		;ldx #ALLOC ; several bytes on STACK for LOADER
+		;lda #$EA
+;@		;pha
+		;dex
+		;bne @-
 
 		;--------	
 		; Set Menu
 		lda TMP
-		pha
+		sta STORE
 		lda TMP+1
-		pha
+		sta STORE+1
 		lda DMACTLS
-		pha
+		sta STORE+2
+
 		lda #$00
 		sta DMACTL
 		lda #$21
@@ -422,38 +429,38 @@ BEGIN
 		
 		ldx #31
 @		lda ramantic-1,x
-		sta $105,x
+		sta dliram-1,x
 		dex
 		bne @-
 		stx PAGE ; <-0
 	
 		lda DLPTRS
-		pha
+		sta STORE+3
 		lda #<antic
 		sta DLPTRS
 		lda DLPTRS+1
-		pha
+		sta STORE+4
 		lda #>antic
 		sta DLPTRS+1
 		lda COLBAKS
-		pha
+		sta STORE+5
 		lda #$00
 		sta COLBAKS
 		lda COLPF0S
-		pha
+		sta STORE+6
 		lda #$06
 		sta COLPF0S
 		lda COLPF1S
-		pha
+		sta STORE+7
 		lda #$0C
 		sta COLPF1S
 		lda COLPF2S
-		pha
+		sta STORE+8
 		lda #$02
 		sta COLPF2S
 		
 		lda CHBAS
-		pha
+		sta STORE+9
 		lda #>fonts
 		sta CHBAS
 		sta CHBASE
@@ -471,11 +478,11 @@ BEGIN
 		sta MEMTOP+1
 		lda #$C0
 		sta RAMTOP
-		lda #$00
+		lda #<ramcold
 		sta DOSVEC
 		sta DOSINI
 		sta CASINI	
-		lda #$01
+		lda #>ramcold
 		sta DOSVEC+1
 		sta DOSINI+1
 		sta CASINI+1
@@ -485,7 +492,7 @@ BEGIN
 		sta COLDST
 		ldx #$05
 @		lda COLDRST,X
-		sta $0100,X
+		sta ramcold,X
 		dex
 		bpl @-
 		;--------
@@ -569,25 +576,25 @@ keynxt
 		; Restore Screen	
 RESTORE	lda #$00
 		sta DMACTL
-		pla
+		LDA STORE+9
 		sta CHBAS
-		pla
+		LDA STORE+8
 		sta COLPF2S
-		pla
+		LDA STORE+7
 		sta COLPF1S
-		pla
+		LDA STORE+6
 		sta COLPF0S
-		pla
+		LDA STORE+5
 		sta COLBAKS
-		pla
+		LDA STORE+4
 		sta DLPTRS+1
-		pla
+		lda STORE+3
 		sta DLPTRS
-		pla
+		lda STORE+2
 		sta DMACTLS
-		pla
+		lda STORE+1
 		sta TMP+1
-		pla
+		lda STORE
 		sta TMP
 
 		;--------	
@@ -791,9 +798,9 @@ setScreen
 		bcc	setScreen
 		tay
 		lda	pageaddrs_lo,y
-		sta	$107
+		sta	dliram+1
 		lda	pageaddrs_hi,y
-		sta	$108
+		sta	dliram+2
 		rts
 pageaddrs_lo
 		dta	<(0+screen_data),<($340+screen_data),<($340*2+screen_data),<($340*3+screen_data)
@@ -918,15 +925,13 @@ ENDBLK 	lda INITAD		; End DOS block
 		rts				; All data readed, back to RUNAD procedure
 		
 RUNPART	lda BANK
-		pha				; Store BANK
+		sta STORE+10				; Store BANK
 		lda	SRC			; Store LSB
-		pha
+		sta STORE+11
 		lda SRC+1		; Store MSB
-		pha
-		txa
-		pha
-		tya
-		pha
+		sta STORE+12
+		stx STORE+13
+		sty STORE+14
 
 		jsr CopyENT		; Copy ENTRY Procedure
 		lda INITAD
@@ -952,15 +957,13 @@ RUNPART	lda BANK
 		sta INITAD+1
 
 		jsr CopyCPY
-		pla
-		tay
-		pla
-		tax
-		pla
+		ldy STORE+14
+		ldx STORE+13
+		lda STORE+12
 		sta SRC+1		; Restore MSB
-		pla
+		lda STORE+11
 		sta SRC			; Restore LSB
-		pla
+		lda STORE+10
 		sta BANK		; Restore BANK
 
 		jmp LOOP
@@ -1041,19 +1044,19 @@ CENDBLK
 		
 CRUNPART
 		lda	BANK
-		pha				; Store BANK
+		sta	STORE+10				; Store BANK
 		lda	SRC			; Store LSB
-		pha
+		sta	STORE+11
 		lda	SRC+1		; Store MSB
-		pha
+		sta	STORE+12
 		lda	CBUFFER
-		pha
+		sta	STORE+13
 		lda	CBUFSRC
-		pha
+		sta	STORE+14
 		txa
-		pha
+		sta	STORE+15
 		tya
-		pha
+		sta	STORE+16
 
 
 		jsr CopyENT		; Copy ENTRY Procedure
@@ -1080,19 +1083,19 @@ CRUNPART
 		sta INITAD+1
 
 		jsr CopyCPY256
-		pla
+		lda STORE+16
 		tay
-		pla
+		lda STORE+15
 		tax
-		pla
+		lda STORE+14
 		sta	CBUFSRC
-		pla
+		lda STORE+13
 		sta	CBUFFER
-		pla
+		lda STORE+12
 		sta	SRC+1		; Restore MSB
-		pla
+		lda STORE+11
 		sta	SRC			; Restore LSB
-		pla
+		lda STORE+10
 		sta	BANK		; Restore BANK
 		clc
 		jmp CLOOP
