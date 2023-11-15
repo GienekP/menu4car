@@ -2,6 +2,7 @@
 {
 	IFS=''
 	while read a; do
+	[ "${a##CC=clang}" != "${a}" ] && echo "CC=gcc" && continue
 	[ "${a##CFLAGS}" != "${a}" ] && echo "${a}" '$(ARCH)' && continue
 	[ "${a##LDFLAGS}" != "${a}" ] && echo "${a}" '$(SUF) $(ARCH)' && continue
 	[ "${a##OBJDIR}" != "${a}" ] && echo "${a}$(SUF)" && continue
