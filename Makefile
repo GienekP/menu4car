@@ -54,5 +54,6 @@ clean:
 	rm -f menu4car.x86_64
 	$(MAKE) -f Makefile.menu4car -C apultra clean SUF=.arm64
 	$(MAKE) -f Makefile.menu4car -C apultra clean SUF=.x86_64
+	$(MAKE) -f Makefile -C apultra clean
 
 	

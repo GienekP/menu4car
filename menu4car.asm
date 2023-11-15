@@ -4,7 +4,7 @@
 ; (c) 2023 GienekP, jhusak
 ;
 ;-----------------------------------------------------------------------
-STORAGE = $48
+STORAGE = $4a
 ALLOC	= ($1e+STORAGE)
 BASEE	= $780+ALLOC
 CYCLBUF	= BASEE+$80
@@ -28,12 +28,13 @@ EBPH    = (BASEE+$b-ALLOC)
 bl      = (BASEE+$c-ALLOC)
 PAGE      = (BASEE+$d-ALLOC)
 STORE      = (BASEE+$e-ALLOC)
-
+; place for storing variables before call, 17 bytes
 KRPDEL	= STORE+17
 oldconsol	= STORE+18
 oldjoy	= STORE+19
-dliram = STORE + 20
-ramcold = STORE + 20 + $20
+TMP	= STORE+20
+dliram = STORE + 22
+ramcold = STORE + 22 + $20
 
 GET_FROM_CAR     = (BASEE-(DTACPYE-GETBYTE))
 PUT_RAM     = (BASEE-(DTACPYE-PUTBYTE))
@@ -51,8 +52,8 @@ RUNCART   = (BASEE-(RUNCARTE-RUNCARTS))
 ;-----------------------------------------------------------------------
 
 
-ZPALLOC = $24
-TMP     = $00
+;ZPALLOC = $24
+;TMP     = $00
 CASINI  = $02 
 WARMST  = $08
 BOOTQ   = $09
@@ -165,7 +166,7 @@ CLPRS		; a=0; y=0
 		rts		
 CLPRE		
 ;-----------------------------------------------------------------------		
-; STACK CODE FOR NORMAL AND BLOCK COMPRESSED
+; RAM CODE FOR NORMAL AND BLOCK COMPRESSED
 DTACPYS
 ; THREE entry points:
 ; GETBYTE - gets byte from cart or whatever
@@ -188,7 +189,7 @@ ADRRSRC	lda $FFFF
 
 DTACPYE
 ;-----------------------------------------------------------------------		
-; STACK CODE FOR COMPRESSED 256-byte Windowed
+; RAM CODE FOR COMPRESSED 256-byte Windowed
 DTA256CPYS
 ; FOUR entry points:
 ; GETBYTE - gets byte from cart or whatever
@@ -407,12 +408,6 @@ KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,
 
 BEGIN
 		jsr TESTSEL
-		;ldx #ALLOC ; several bytes on STACK for LOADER
-		;lda #$EA
-;@		;pha
-		;dex
-		;bne @-
-
 		;--------	
 		; Set Menu
 		lda TMP
@@ -903,14 +898,12 @@ DECRTRANSF
 
 TRANSF		jsr GET_FROM_CAR			; Read BYTE
 		;sta COLBAK		; Write to "noise"
-		;clc				; For Smart Stack Procedure
-		jsr PUT_RAM			; Write BYTE
-		lda DST ; Check Destination
-		cmp CNT
-		bne @+
-		lda DST+1
-		cmp CNT+1
-@		beq ENDBLK		; If last
+		;clc			; For Smart Stack Procedure
+		jsr PUT_RAM		; Write BYTE
+
+		jsr CmpDst		; Check Destination
+		beq ENDBLK		; If last
+
 		inc DST			; Prepare Destination for next write
 		bne @+
 		inc DST+1
@@ -918,7 +911,7 @@ TRANSF		jsr GET_FROM_CAR			; Read BYTE
 		beq ERRORWM		; ERROR NoDATA
 		bne TRANSF		; Repeat transfer byte
 		
-ENDBLK 	lda INITAD		; End DOS block
+ENDBLK		lda INITAD		; End DOS block
 		and INITAD+1
 		cmp #$FF		; New INITAD?
 		bne RUNPART		; Run INIT Procedure
@@ -1020,16 +1013,11 @@ CTRANSF		GET_COMP_BYTE			; Read BYTE
 		nop
 		bcs CERRORWM		; ERROR NoDATA
 		;sta COLBAK		; Write to "noise"
-		;clc				; For Smart Stack Procedure
 		jsr PUT_RAM			; Write BYTE
-		; Check Destination
-		lda DST
-		cmp CNT
-		bne @+
-		lda DST+1
-		cmp CNT+1
+		jsr CmpDst		; Check Destination
 		beq CENDBLK		; If last
-@		inc DST			; Prepare Destination for next write
+
+		inc DST			; Prepare Destination for next write
 		bne @+
 		inc DST+1
 @
@@ -1037,10 +1025,8 @@ CTRANSF		GET_COMP_BYTE			; Read BYTE
 		
 CENDBLK 
 		lda INITAD		; End DOS block
+		and  INITAD+1
 		cmp #$FF		; New INITAD?
-		bne CRUNPART		; Run INIT Procedure
-		lda INITAD+1
-		cmp #$FF
 		bne CRUNPART		; Run INIT Procedure
 		jmp CREADBLC		; No EOF read next block
 		
@@ -1160,16 +1146,12 @@ IncSrc		inc SRC
 
 ;-----------------------------------------------------------------------		
 ; Cmp Destination
-;CmpDst	lda DST
-;		cmp CNT
-;		bne @+
-;		lda DST+1
-;		cmp CNT+1
-;		bne @+
-;		sec
-;		rts
-;@		clc
-;		rts
+CmpDst		lda DST
+		cmp CNT
+		bne @+
+		lda DST+1
+		cmp CNT+1
+@		rts
 
 ;-----------------------------------------------------------------------		
 ; Copy Entry to Stack

@@ -626,7 +626,7 @@ static unsigned int pos=0;
 						if (incrsize==size)
 							printf("Added, length: %d\n",incrsize);
 						else
-							printf("Compressed with method %d, length (compr/uncompr): %d/%d, ratio %d%%\n",choosen_compress_method,comprsize,size,comprsize*100/size);
+							printf("Compressed with method %02x, length (compr/uncompr): %d/%d, ratio %d%%\n",choosen_compress_method,comprsize,size,comprsize*100/size);
 					}
 					osize+=incrsize;
 					ncsize+=size;
