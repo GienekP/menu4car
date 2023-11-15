@@ -867,31 +867,31 @@ READRAWXEX
 ; --------------------------------------------------
 ERRORWM	jmp RESETCD 	; Warm Reset if ERROR
 @		jsr IncSrc
-		bcs ERRORWM
+		beq ERRORWM
 		jsr GET_FROM_CAR
 		cmp #$FF
 		beq LOOP
 		bne ERRORWM
 LOOP	jsr IncSrc
-		bcs ERRORWM
+		beq ERRORWM
 		
 READBLC	jsr GET_FROM_CAR			; Read LSB
 		STA DST
 		jsr IncSrc		; SRC++
-		bcs ERRORWM		; ERROR NoDATA
+		beq ERRORWM		; ERROR NoDATA
 		jsr GET_FROM_CAR			; Read HSB
 		sta DST+1
 		jsr IncSrc
-		bcs ERRORWM		; ERROR NoDATA
+		beq ERRORWM		; ERROR NoDATA
 		
 		jsr GET_FROM_CAR
 		sta CNT			; Set Last Write LSB
 		jsr IncSrc
-		bcs ERRORWM
+		beq ERRORWM
 		jsr GET_FROM_CAR
 		sta CNT+1		; Set Last Write MSB
 		jsr IncSrc
-		bcs ERRORWM	
+		beq ERRORWM	
 		lda CNT
 		ora CNT+1
 		bne TRANSF
@@ -905,23 +905,25 @@ TRANSF		jsr GET_FROM_CAR			; Read BYTE
 		;sta COLBAK		; Write to "noise"
 		;clc				; For Smart Stack Procedure
 		jsr PUT_RAM			; Write BYTE
-		jsr CmpDst		; Check Destination
-		bcs ENDBLK		; If last
+		lda DST ; Check Destination
+		cmp CNT
+		bne @+
+		lda DST+1
+		cmp CNT+1
+@		beq ENDBLK		; If last
 		inc DST			; Prepare Destination for next write
 		bne @+
 		inc DST+1
 @		jsr IncSrc		; Increment Source
-		bcs ERRORWM		; ERROR NoDATA
-		bcc	TRANSF		; Repeat transfer byte
+		beq ERRORWM		; ERROR NoDATA
+		bne TRANSF		; Repeat transfer byte
 		
 ENDBLK 	lda INITAD		; End DOS block
+		and INITAD+1
 		cmp #$FF		; New INITAD?
 		bne RUNPART		; Run INIT Procedure
-		lda INITAD+1
-		cmp #$FF
-		bne RUNPART		; Run INIT Procedure
 		jsr IncSrc		; Increment Source
-		bcc READBLC		; No EOF read next block
+		bne READBLC		; No EOF read next block
 		rts				; All data readed, back to RUNAD procedure
 		
 RUNPART	lda BANK
@@ -1121,7 +1123,7 @@ SETPOSSRC
 
 ;-----------------------------------------------------------------------		
 ; Inc Source
-IncSrc	inc SRC
+IncSrc		inc SRC
 		bne @+
 		inc SRC+1
 		bit SRC+1
@@ -1140,17 +1142,14 @@ IncSrc	inc SRC
 		bne @+
 		lda tabbnk+4,X
 		cmp BANK
-		bne @+
-		sec
-		rts
-@		clc
+@		
 		rts
 		
 ;-----------------------------------------------------------------------		
 ; Set Destination
-SetDst	stx DST
-		sty DST+1
-		rts
+;SetDst	stx DST
+;		sty DST+1
+;		rts
 
 ;-----------------------------------------------------------------------		
 ; Inc Destination
@@ -1161,16 +1160,16 @@ SetDst	stx DST
 
 ;-----------------------------------------------------------------------		
 ; Cmp Destination
-CmpDst	lda DST
-		cmp CNT
-		bne @+
-		lda DST+1
-		cmp CNT+1
-		bne @+
-		sec
-		rts
-@		clc
-		rts
+;CmpDst	lda DST
+;		cmp CNT
+;		bne @+
+;		lda DST+1
+;		cmp CNT+1
+;		bne @+
+;		sec
+;		rts
+;@		clc
+;		rts
 
 ;-----------------------------------------------------------------------		
 ; Copy Entry to Stack

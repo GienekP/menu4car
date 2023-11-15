@@ -34,7 +34,7 @@ test : $(MAIN).asm apldecr_zp.asm
 	mads "$<" -t -o:menu4car.obx | sed "s/\\$$//g"
 
 $(MAIN).bin : $(MAIN).asm apldecr_zp.asm
-	mads "$<" -t -o:"$@" | sed "s/\\$$//g" | tee |  grep "#define" >menu4car_interface.h
+	mads "$<" -t -l -o:"$@" | sed "s/\\$$//g" | tee |  grep "#define" >menu4car_interface.h
 
 libapultra$(SUF).a:
 	$(shell ./apultra_fix_makefile.sh)

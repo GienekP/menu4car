@@ -1,9 +1,10 @@
-
 /*--------------------------------------------------------------------*/
 /* menu4car                                                           */
 /* by GienekP                                                         */
 /* (c) 2023                                                           */
 /*--------------------------------------------------------------------*/
+//#define SAVERAW
+
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -342,7 +343,7 @@ unsigned int loadFile(const char *path, U8 *buf, unsigned int sizebuf)
 	return size;
 }
 /*--------------------------------------------------------------------*/
-/*
+#ifdef SAVERAW
 void saveRAW(U8 *raw, unsigned int size)
 {
 	static int licz=0;
@@ -353,7 +354,7 @@ void saveRAW(U8 *raw, unsigned int size)
 	fwrite(raw,1,size,pf);
 	fclose(pf);
 };
-*/
+#endif
 /*--------------------------------------------------------------------*/
 unsigned int repairFile(U8 *buf, unsigned int size)
 {
@@ -381,16 +382,14 @@ unsigned int repairFile(U8 *buf, unsigned int size)
 				i+=(1+stop-start);
 			};
 		};
-		if (run==0)
+
+		if (!init && !run)
 		{
-			if (init==0)
-			{
-				U8 runad[6]={0xE0, 0x02, 0xE1, 0x02, 0xFF, 0xFF};
-				runad[4]=(first&0xFF);
-				runad[5]=((first>>8)&0xFF);
-				for (i=0; i<6; i++) {buf[ret+i]=runad[i];};
-				ret+=6;
-			};
+			U8 runad[6]={0xE0, 0x02, 0xE1, 0x02, 0xFF, 0xFF};
+			runad[4]=(first&0xFF);
+			runad[5]=((first>>8)&0xFF);
+			for (i=0; i<6; i++) {buf[ret+i]=runad[i];};
+			ret+=6;
 		};
 	}
 	else
@@ -585,7 +584,7 @@ static unsigned int pos=0;
 							0, 
 							NULL,
 							NULL);
-					choosen_compress_method=1;
+					choosen_compress_method=0x10;
 				}
 				if (do_compress==-1 || do_compress==2) {
 					// block compression, to do.
@@ -596,17 +595,19 @@ static unsigned int pos=0;
 						int j;
 						for (j=0; j<comprsize2; j++) {bufcompr[j]=bufcompr2[j];};
 						comprsize=comprsize2;
-						choosen_compress_method=2;
+						choosen_compress_method=0x20;
 
 					}
 				}
 
-				//saveRAW(buf,size);
+				#ifdef SAVERAW
+				saveRAW(buf,size);
+				#endif
 				int over=0;
 				int incrsize=0;
 				if (do_compress && ((comprsize < size) || do_compress>=1)) // forced 
 				{
-					flags|=((choosen_compress_method)<<4);
+					flags|=choosen_compress_method;
 					over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags);
 					incrsize=comprsize;
 				}
