@@ -914,12 +914,12 @@ TRANSF		jsr GET_FROM_CAR			; Read BYTE
 ENDBLK		lda INITAD		; End DOS block
 		and INITAD+1
 		cmp #$FF		; New INITAD?
-		bne RUNPART		; Run INIT Procedure
+		bne INITPART		; Run INIT Procedure
 		jsr IncSrc		; Increment Source
 		bne READBLC		; No EOF read next block
 		rts				; All data readed, back to RUNAD procedure
 		
-RUNPART	lda BANK
+INITPART	lda BANK
 		sta STORE+10				; Store BANK
 		lda	SRC			; Store LSB
 		sta STORE+11
@@ -960,8 +960,9 @@ RUNPART	lda BANK
 		sta SRC			; Restore LSB
 		lda STORE+10
 		sta BANK		; Restore BANK
-
-		jmp LOOP
+		jsr IncSrc
+		jne READBLC
+		rts
 ; --------------------------------------------------
 ; compressed read binary part
 ; --------------------------------------------------
@@ -989,7 +990,7 @@ CERRORWM	jmp RESETCD		; fill-up code
 		GET_COMP_BYTE
 		cmp #$FF
 		bne CREADBLC
-CLOOP	;jsr IncSrc
+CLOOP
 		bcs CERRORWM
 		
 CREADBLC	GET_COMP_BYTE			; Read LSB
@@ -1027,10 +1028,10 @@ CENDBLK
 		lda INITAD		; End DOS block
 		and  INITAD+1
 		cmp #$FF		; New INITAD?
-		bne CRUNPART		; Run INIT Procedure
+		bne CINITPART		; Run INIT Procedure
 		jmp CREADBLC		; No EOF read next block
 		
-CRUNPART
+CINITPART
 		lda	BANK
 		sta	STORE+10				; Store BANK
 		lda	SRC			; Store LSB
@@ -1120,13 +1121,13 @@ IncSrc		inc SRC
 @
 		; Cmp Source
 		ldx POS
-		lda tabalo+4,X
+		lda tabalo+1,X
 		cmp SRC
 		bne @+
-		lda tabahi+4,X
+		lda tabahi+1,X
 		cmp SRC+1
 		bne @+
-		lda tabbnk+4,X
+		lda tabbnk+1,X
 		cmp BANK
 @		
 		rts
