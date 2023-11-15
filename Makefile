@@ -8,17 +8,12 @@ ifeq ($(SYSTEM)$(ARCH),Darwin arm64)
 MNAME = $(shell uname -m)
 $(MAIN): $(MAIN).x86_64 $(MAIN).arm64
 	lipo -create -output $@ $^
-	#rm -f $^
 
 $(MAIN).x86_64:
-	#$(MAKE) clean SUF=.x86_64
 	$(MAKE) ARCH="-target x86_64-apple-macos10.6" SUF=.x86_64 
-	#mv menu4car $@
 
 $(MAIN).arm64:
-	#$(MAKE) clean SUF=.arm64
 	$(MAKE) ARCH="-target arm64-apple-macos11" SUF=.arm64
-	#mv menu4car $@
 
 else
 
@@ -44,6 +39,12 @@ $(MAIN).bin : $(MAIN).asm apldecr_zp.asm
 libapultra$(SUF).a:
 	$(shell ./apultra_fix_makefile.sh)
 	$(MAKE) -C apultra -f Makefile.menu4car libapultra$(SUF).a SUF=$(SUF)
+
+clane: clean
+
+clena: clean
+
+celan: clean
 
 clean:
 	rm -f menu4car
