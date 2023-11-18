@@ -287,7 +287,7 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 				SETDATA(data,pos+1,0x80,((stop/BANKSIZE)&0x7F),stop,0);
 			}
 			else {
-				printf("Cart image '%s' not added due to insufficient room.\n",name);
+				//printf("Cart image '%s' not added due to insufficient room.\n",name);
 				skipcounter++;
 				ret=stop-carsize;
 				stop=start;
@@ -311,16 +311,21 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 	}
 	else
 	{
-		printf("File '%s' not added due to insufficient room.\n",name);
+		//printf("File '%s' not added due to insufficient room.\n",name);
 		skipcounter++;
 		ret=stop-carsize;
 		stop=start;
 	}
 
 	//
-	if (!ret)
+	if (!ret) {
+		if (be_verbose)
+			printf("SUCCESS");
 		if (be_verbose>=2)
-			printf("Added, length %d.\n",size);
+			printf(", added, length %d.",size);
+		if (be_verbose)
+			printf("\n");
+	}
 	return ret;
 }
 /*--------------------------------------------------------------------*/
@@ -339,6 +344,7 @@ unsigned int loadFile(const char *path, U8 *buf, unsigned int sizebuf)
 	{
 		fprintf(stderr,"Load Error \"%s\".\n",path);
 		errorcounter++;
+		return -1;
 	};
 	return size;
 }
@@ -548,8 +554,10 @@ static unsigned int pos=0;
 	if (status)
 	{
 		unsigned int size=loadFile(path,buf,sizeof(buf)-BANKSIZE-6);
+		if (size==-1) return pos;
+
 		if (be_verbose)
-			printf("File loaded %s, length: %d ",path,size);
+			printf("%s length: %d ",path,size);
 		int filetype=checkTypeByPath(path);
 		if (filetype==TYPE_XEX) {
 			if (be_verbose)
@@ -618,15 +626,28 @@ static unsigned int pos=0;
 				}
 
 				if (over) {
-					if (be_verbose)
-						printf("SKIPPED: \"%s\", does not fit, need %i bytes.\n",name,over);
+					if (be_verbose) {
+						printf("SKIPPED");
+						if (be_verbose>=2)
+							printf(", \"%s\", does not fit, need %i bytes.",name,over);
+						printf("\n");
+					}
 				}
 				else {
+					if (0)
 					if (be_verbose) {
-						if (incrsize==size)
-							printf("Added, length: %d\n",incrsize);
-						else
-							printf("Compressed with method %02x, length (compr/uncompr): %d/%d, ratio %d%%\n",choosen_compress_method,comprsize,size,comprsize*100/size);
+						printf("SUCCESS!");
+						if (be_verbose>=2) {
+							if (incrsize==size)
+							{
+								printf(", added, length: %d",incrsize);
+							}
+							else
+							{
+								printf(", compressed with method %02x, length (compr/uncompr): %d/%d, ratio %d%%",choosen_compress_method,comprsize,size,comprsize*100/size);
+							}
+						}
+						printf("\n");
 					}
 					osize+=incrsize;
 					ncsize+=size;
@@ -759,7 +780,8 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 	if (pf)
 	{
 		i=0;
-		while (i<MAX_ENTRIES)
+		int o=0;
+		while (i<MAX_ENTRIES && o<200)
 		{
 			U8 status=readLine(pf,name,path,addparams);
 			if (strlen(path)>0 && strlen(name)>0) {
@@ -767,12 +789,12 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 					printf("Line read num: %d, '%s','%s','%s'\n",i,name,path,addparams);
 				if (name[0]=='#')
 					continue;
-				addPos(data,carsize,name,path,addparams,status);
+				i=addPos(data,carsize,name,path,addparams,status);
 				//outTable(data);
-				i++;
 			}
 			else
 				break;
+			if (i>0) o++; // begin counting aftter some files added
 		};
 		// output summary info
 		addPos(0,carsize,0,0,0,0);
@@ -827,7 +849,7 @@ U8 saveCAR(const char *filename, U8 *data, unsigned int carsize, unsigned int ph
 					fprintf(stderr,"Error: Cartridge image '%s' truncated (%d bytes written)\n",filename, j);
 			}
 
-			if (j==16)
+			if (j==16 || output_type==TYPE_BIN)
 			{
 				i=fwrite(data,sizeof(U8),phys_carsize,pf);
 				if (i==phys_carsize) {
@@ -1020,6 +1042,18 @@ void menu4car(const char * filemenu, const char * logo, const char * colortablef
 	addFont(cardata,fontpath);
 	addData(cardata,cart_size,filemenu);
 	addPages(cardata);
+
+	int output_type=checkTypeByPath(carname);
+	if (output_type==TYPE_UNKNOWN){
+		char fname [1024];
+		sprintf(fname,"%s.xex",carname);
+		saveCAR(fname,cardata,cart_size,cart_size_physical);
+		sprintf(fname,"%s.car",carname);
+		saveCAR(fname,cardata,cart_size,cart_size_physical);
+		sprintf(fname,"%s.bin",carname);
+		saveCAR(fname,cardata,cart_size,cart_size_physical);
+	}
+	else
 	saveCAR(carname,cardata,cart_size,cart_size_physical);
 }
 void usage() {
@@ -1029,7 +1063,7 @@ void usage() {
 		printf("\nOptions:\n");
 		printf("	-p <path> - picdata path (default Menu4Car, built in), raw 8-bit b&w 512 byte length\n");
 		printf("	-t <path> - color table path (default rainbow, built in), 16 byte length of atari colors\n");
-		printf("	-o <path> - outputcar path (filetype: <>.car, <>.bin or <>.exe or <>.xex\n");
+		printf("	-o <path> - outputcar path (filetype: <>.car, <>.bin or <>.exe or <>.xex; no ext to save all .car, .bin and .xex.\n");
 		printf("	-c <compression> - forced compression method 0/1/2/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
 		printf("	-f <path> - path to 1024 byte length font file\n");
 		printf("	-s <size> - logical cart size: 32/64/128/256/512/1024, default 1024\n");

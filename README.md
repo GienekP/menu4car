@@ -36,6 +36,9 @@ then outcartimage.car is a cart image MAXFLASH (type 42) compatible.
 
 and outcartimage.xex is a flasher application ready to be placed on the media readable by real Atari. The file size nay exceed 1 MB, so floppy disk may too small for cartridge images filled up more than disk size.
 
+    ./menu4car menu4car.txt -o outcartimage
+
+and outcartimage.xex, outcartimage.car and outcartimage.bin files are written.
 
 Full list of parameteres:
 

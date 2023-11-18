@@ -42,6 +42,8 @@ libapultra$(SUF).a:
 
 clane: clean
 
+claen: clean
+
 clena: clean
 
 celan: clean

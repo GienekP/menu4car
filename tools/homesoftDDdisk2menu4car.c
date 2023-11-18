@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 
 uint8_t buffer[256*10000];
@@ -19,73 +20,83 @@ uint8_t inttoasc(uint8_t a) { return asctoint(asctoint(a)); }
 
 int main(int argc, char ** argv)
 {
-   //int num;
-   FILE *filein;
+	//int num;
+	FILE *filein;
+	FILE *fileout;
+	char fno[1024];
 
-   // use appropriate location if you are using MacOS or Linux
-   filein = fopen(argv[1],"r");
-   if(filein == NULL)
-   {
-      printf("\nUsage: %s <HomesoftAtrFilePath>\n\n",argv[0]);   
-      exit(1);             
-   }
-   fread(buffer, 16, 1, filein);
-   size_t bytes=fread(buffer, 1,  256*10000, filein);
+	// use appropriate location if you are using MacOS or Linux
+	filein = fopen(argv[1],"r");
+	strncpy(fno,argv[1],1023);
+	fno[strlen(fno)-1]='T';
+	fno[strlen(fno)-2]='X';
+	fno[strlen(fno)-3]='T';
 
 
-   fprintf(stderr,"read ATR bytes: %zu\n",bytes);
-   fclose(filein);
+	if(filein == NULL)
+	{
+		printf("\nUsage: %s <HomesoftAtrFilePath>\n\n",argv[0]);   
+		exit(1);             
+	}
+	fread(buffer, 16, 1, filein);
+	size_t bytes=fread(buffer, 1,  256*10000, filein);
+
+
+	fprintf(stderr,"read ATR bytes: %zu\n",bytes);
+	fclose(filein);
 
 
 #define BASETOC 0x16680
 #define BASENAME 0x16B80
 
-   for (int i=0; i<24; i++) {
+	fileout = fopen(fno,"w");
+	for (int i=0; i<24; i++) {
 
-	   int baseentry=BASETOC + (i/8)*256 + (i%8)*16;
-	   int basename=BASENAME + 26 + (i)*24;
+		int baseentry=BASETOC + (i/8)*256 + (i%8)*16;
+		int basename=BASENAME + 26 + (i)*24;
 
-	   if (buffer[baseentry]==0x42) {
-		   int last=22;
-		   for(int j=21; j>=0; j--)
-		   {
-			   char c=buffer[basename + j];
-			   if (!c) last=j;
-			   if (c) break;
-		   }
-		   for(int j=0; j<last; j++)
-		   {
-			   char c=buffer[basename + j];
-			   printf("%c",inttoasc(c));
-		   }
+		if (buffer[baseentry]==0x42) {
+			int last=22;
+			for(int j=21; j>=0; j--)
+			{
+				char c=buffer[basename + j];
+				if (!c) last=j;
+				if (c) break;
+			}
+			for(int j=0; j<last; j++)
+			{
+				char c=buffer[basename + j];
+				fprintf(fileout,"%c",inttoasc(c));
+			}
 
-		   printf("|");
+			fprintf(fileout,"|");
 
-		   char name[20];
-		   char * np=name;
+			char name[20];
+			char * np=name;
 
-		   for(int j=0; j<8; j++)
-		   {
-			   char c=buffer[baseentry + j + 5];
-			   if (c!=' ') *np++=c;
-		   }
+			for(int j=0; j<8; j++)
+			{
+				char c=buffer[baseentry + j + 5];
+				if (c!=' ') *np++=c;
+			}
 
-		   int f=1;
-		   for(int j=0; j<3; j++)
-		   {
-			   char c=buffer[baseentry + j + 13];
-			   if (c!=' ') {
-				   if (f) *np++='.';
-				   f=0;
-				   *np++=c;
-			   }
-		   }
-		   *np++=0;
-		   printf("%s\n",name);
-		   saveFile(baseentry, name);
-	   }
+			int f=1;
+			for(int j=0; j<3; j++)
+			{
+				char c=buffer[baseentry + j + 13];
+				if (c!=' ') {
+					if (f) *np++='.';
+					f=0;
+					*np++=c;
+				}
+			}
+			*np++=0;
+			fprintf(fileout,"%s\n",name);
 
-   }
+			saveFile(baseentry, name);
+		}
+	}
+	fclose(fileout);
 
 
 }
