@@ -392,6 +392,10 @@ pic		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $
 ; Keyboard Table
 ;		      A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
 KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,$2F,$28,$3E,$2D,$0B,$10,$2E,$16,$2B,$17
+		; 1 2 3 4
+		dta 31,30,26,24 
+keytbllen	=	*-KEYTBLE
+
 
 ;-----------------------------------------------------------------------		
 ;-----------------------------------------------------------------------		
@@ -427,6 +431,8 @@ BEGIN
 		sta dliram-1,x
 		dex
 		bne @-
+		.print "PAGE offset ",*+1-$A000
+		ldx #0
 		stx PAGE ; <-0
 	
 		lda DLPTRS
@@ -504,7 +510,7 @@ BEGIN
 		stx CNT	; store counted entries
 		sta POS ; just in case if one pos
 		dex
-		beq RESTORE
+		jeq RESTORE
 		lda #$0
 		sta TMP
 		sta TMP+1
@@ -532,7 +538,7 @@ MLOOP	jsr PAINT
 		beq MLOOP
 		
 		lda KBCODE
-		ldx #27
+		ldx #keytbllen
 @		cmp KEYTBLE,X
 		beq	FINDKEY
 		dex
@@ -544,7 +550,21 @@ RANDOPT	lda RANDOM
 		sta POS	; random pos, 0<=CNT<=$67
 		bcc RESTORE ; with random  pos without key translation
 FINDKEY		dex
-		cpx CNT
+		cpx #keytbllen-5
+		bcc @+
+		txa
+		sec
+		sbc #keytbllen-4
+		cmp NUMPAGES
+		bpl @+
+		clc
+		adc #1
+		sta PAGE
+		jsr setScreen
+		jmp MLOOP
+
+
+@		cpx CNT
 		bcs RANDOPT ; random if bigger than CNT
 		stx POS
 
