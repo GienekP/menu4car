@@ -4,10 +4,11 @@
 ; (c) 2023 GienekP, jhusak
 ;
 ;-----------------------------------------------------------------------
-STORAGE = $4a
-ALLOC	= ($1e+STORAGE)
-BASEE	= $780+ALLOC
-CYCLBUF	= BASEE+$80
+STORAGE = $4A
+CODEBUF = $1E
+ALLOC   = (CODEBUF+STORAGE)
+CYCLBUF = $700
+BASEE   = $800+ALLOC
 BANK    = (BASEE-(DTACPYE-GETBYTE)+1)
 SRC     = (BASEE-(DTACPYE-ADRSRC)+1)
 RSRC    = (BASEE-(DTACPYE-ADRRSRC)+1)
@@ -80,6 +81,7 @@ COLBAKS	= $02C8
 INITAD  = $02E2
 RUNAD   = $02E0
 MEMTOP  = $02E5
+MEMLO   = $02E7
 CHBAS   = $02F4
 BASICF  = $03F8
 GINTLK  = $03FA
@@ -168,6 +170,7 @@ CLPRE
 ;-----------------------------------------------------------------------		
 ; RAM CODE FOR NORMAL AND BLOCK COMPRESSED
 DTACPYS
+; length 28
 ; THREE entry points:
 ; GETBYTE - gets byte from cart or whatever
 ; PUTBYTE - puts byte to ram
@@ -191,6 +194,7 @@ DTACPYE
 ;-----------------------------------------------------------------------		
 ; RAM CODE FOR COMPRESSED 256-byte Windowed
 DTA256CPYS
+; length 28
 ; FOUR entry points:
 ; GETBYTE - gets byte from cart or whatever
 ; PUTBYTE - puts byte to ram
@@ -215,6 +219,7 @@ SRCP256	lda CYCLBUF ; entry point
 
 DTA256CPYE
 ;--------------------------------------------
+; length 20
 ENTRYS	sta $D5FF
 		lda TRIG3
 		sta GINTLK
@@ -227,6 +232,7 @@ ENTRYE
 
 ;--------------------------------------------
 ; RUNCART ram procedure
+; length 12
 ; copies procedure to ram.
 ; In ram:
 ; sets proper cart bank (passed in A)
@@ -412,7 +418,12 @@ keytbllen	=	*-KEYTBLE
 
 BEGIN
 		jsr TESTSEL
-		;--------	
+		; MEMLO
+		lda #$08
+		sta MEMLO+1
+		lda #ALLOC
+		sta MEMLO
+		;--------
 		; Set Menu
 		lda TMP
 		sta STORE
