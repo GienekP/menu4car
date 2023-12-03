@@ -56,6 +56,30 @@ Binaries are in "Releases" tab.
 
 ## Build the executables:
 
+### For windows 10/11
+
+ - Download and install mingw32 from site https://sourceforge.net/projects/mingw
+ - Run downloaded installer
+ - select:
+ -- mingw-developer-tools
+ -- mingw32-basev
+ -- msys-base
+   then apply changes.
+
+Then add to the path (Edit system environemnt variables):
+ - c:\MinGW\msys\1.0\bin
+ - c:\MinGW\bin
+
+Then Windows-R and enter cmd to run shell
+Tools like make, bash, awk, sed should work now.
+
+### for all systems then:
+
+You will need mads.exe which can be downloaded from https::github.com/tebe6502/Mad-Assembler from bin/windows catalog.
+You will also need git (I personally have it installed under WSL and switch from env to env, but it can be installed separately)
+
+You can download the code from repositories below by hand from github (as zip) and set them by hand (https://github.com/GienekP/menu4car and https://github.com/emmanuel-marty/apultra)
+
 To get the code, type in terminal:
 
     git clone https://github.com/GienekP/menu4car.git
@@ -65,6 +89,7 @@ To init submodules, type:
     cd menu4car
     git submodule init
     git submodule update
+
 
 Then type "make" to make dependences (apultra library) and the menu4car itself.
 

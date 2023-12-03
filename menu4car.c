@@ -4,11 +4,18 @@
 /* (c) 2023                                                           */
 /*--------------------------------------------------------------------*/
 //#define SAVERAW
+#if defined(__MINGW32__) || defined(__MINGW64__)
+#define __MINGW__
+#endif
 
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+
+#if !defined(__MINGW__)
 #include <sysexits.h>
+#endif
+
 #include <sys/param.h>
 #include <errno.h>
 
@@ -24,6 +31,8 @@ typedef unsigned char U8;
 #define DELIM	('|')
 #define MAX_ENTRIES	104
 #define MAX_ENTRIES_1	(MAX_ENTRIES+1)
+
+#define	MIN(a,b)	((a)>(b)?(b):(a))
 
 // those types correspond to .asm file
 #define	TYPE_XEX	0
@@ -1070,7 +1079,11 @@ void usage() {
 		printf("	-S <size> - physical cart size: 32/64/128/256/512/1024, default as logical; if set must be after -s\n");
 		printf("	-v - be verbose\n");
 		printf("	-? - this help\n\n");
+#ifndef __MINGW__
 		exit(EX_USAGE);
+#else
+		exit(64);
+#endif
 }
 /*--------------------------------------------------------------------*/
 int main( int argc, char* argv[] )

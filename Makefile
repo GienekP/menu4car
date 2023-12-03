@@ -50,6 +50,7 @@ celan: clean
 
 clean:
 	rm -f menu4car
+	rm -f menu4car.exe
 	rm -f *.o
 	rm -f *.lab
 	rm -f menu4car.arm64
