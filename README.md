@@ -75,10 +75,10 @@ Tools like make, bash, awk, sed should work now.
 
 ### for all systems then:
 
-You will need mads.exe which can be downloaded from https::github.com/tebe6502/Mad-Assembler from bin/windows catalog.
-You will also need git (I personally have it installed under WSL and switch from env to env, but it can be installed separately)
+You will need mads/mads.exe which can be downloaded from https::github.com/tebe6502/Mad-Assembler from bin/<SO>/ catalog.
+You will also need git for convenience (I personally have it installed under WSL and switch from env to env, but it can be installed separately)
 
-You can download the code from repositories below by hand from github (as zip) and set them by hand (https://github.com/GienekP/menu4car and https://github.com/emmanuel-marty/apultra)
+If you do not want to use git, you can download the code from repositories below by hand from github (as zip) and set them by hand (https://github.com/GienekP/menu4car and https://github.com/emmanuel-marty/apultra)
 
 To get the code, type in terminal:
 
@@ -89,7 +89,8 @@ To init submodules, type:
     cd menu4car
     git submodule init
     git submodule update
-
+    
+In case "by hand" the apultra content should be placed in menu4car/apultra catalog.
 
 Then type "make" to make dependences (apultra library) and the menu4car itself.
 
