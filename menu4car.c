@@ -818,7 +818,13 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 				//outTable(data);
 			}
 			else
+			if (strlen(path)==0 && strlen(name)==0) {
 				break;
+			}
+			else if (strlen(path)==0 || strlen(name)==0) {
+				fprintf(stderr,"BAD Line read num: %d, '%s','%s','%s'\n",i,name,path,addparams);
+				errorcounter++;
+			}
 			if (i>0) o++; // begin counting aftter some files added
 		};
 		// output summary info
