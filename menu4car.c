@@ -113,7 +113,14 @@ U8 pagemap[] = {
 
 };
 */
+/*--------------------------------------------------------------------*/
+void fillData(U8 *cardata, unsigned int size, U8 byte)
+{
+	unsigned int i;
+	for (i=0; i<size; i++) {cardata[i]=byte;};
+}
 
+/*--------------------------------------------------------------------*/
 #define GETW(b,i) (b[(i)]|(b[(i)+1])<<8)
 #define PUTW(b,i,v) {b[(i)]=(v)&0xff;(b[(i)+1])=((v)>>8)&0xff;}
 unsigned int getUTF8(U8 **name)
@@ -440,7 +447,7 @@ unsigned int compressAPLBlockByBlock(U8 *bufin, unsigned int retsize, U8 * bufou
 			o+=4;
 
 			if (tsize>=32) {
-				fillData(bufout,FLASHMAX,0);
+				for (j=o; j<MIN(o+tsize,FLASHMAX); j++) {bufout[j]=0;};
 
 				csize= apultra_compress(&bufin[i],
 						&bufout[o],
@@ -1003,12 +1010,6 @@ void addLogo(U8 *cardata, const char *logofile, unsigned int size, unsigned int 
 			fclose(pf);
 		};
 	};
-}
-/*--------------------------------------------------------------------*/
-void fillData(U8 *cardata, unsigned int size, U8 byte)
-{
-	unsigned int i;
-	for (i=0; i<size; i++) {cardata[i]=byte;};
 }
 /*--------------------------------------------------------------------*/
 void addFont(U8 * cardata, const char * fontpath)
