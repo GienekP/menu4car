@@ -13,6 +13,8 @@ BANK    = (BASEE-(DTACPYE-GETBYTE)+1)
 SRC     = (BASEE-(DTACPYE-ADRSRC)+1)
 RSRC    = (BASEE-(DTACPYE-ADRRSRC)+1)
 DST     = (BASEE-(DTACPYE-ADRDST)+1)
+CADDRESS  = ($400+(CADR-CLPRS))
+NAME	= (BASEE-(GR0INITE-TNAME))
 
 CBUFFER = (BASEE-(DTA256CPYE-CYCL256)+1)
 CBUFSRC = (BASEE-(DTA256CPYE-SRCP256)+1)
@@ -83,6 +85,11 @@ RUNAD   = $02E0
 MEMTOP  = $02E5
 MEMLO   = $02E7
 CHBAS   = $02F4
+
+ICCMD   = $0342
+ICBUFA  = $0344
+ICAX1   = $034A
+
 BASICF  = $03F8
 GINTLK  = $03FA
 
@@ -106,6 +113,7 @@ WSYNC   = $D40A
 VCOUNT  = $D40B
 NMIEN   = $D40E
 
+JCIOMAIN = $E456
 RESETCD	= $E477
 
 ;-----------------------------------------------------------------------		
@@ -161,8 +169,8 @@ CLPRS		; a=0; y=0
 @		sta CADR:$a000,y
 		iny
 		bne @-
-		inc CADR+1
-		bit CADR+1
+		inc CADDRESS+1
+		bit CADDRESS+1
 		bvc @-
 		sta $D500
 		rts		
@@ -227,6 +235,7 @@ ENTRYS	sta $D5FF
 ADRRUN	jsr RESETCD
 		sei
 		sta $D500
+
 ADRBCK	jmp EXIT
 ENTRYE
 
@@ -403,6 +412,57 @@ KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,
 keytbllen	=	*-KEYTBLE
 
 
+;-----------------------------------------------------------------------	
+reinit_e
+		ldx #(GR0INITE-GR0INITS)
+@		lda GR0INITS-1,X
+		sta BASEE-(GR0INITE-GR0INITS)-1,X
+		dex
+		bne @-
+
+		lda #$c0
+		sta RAMTOP
+		sta MEMTOP+1
+		stx MEMTOP
+
+		lda #$0c ; close
+		; ldx #$00 x is 0 already
+		sta ICCMD,X
+		jsr JCIOMAIN
+
+		;ldx #$01
+		;stx CRITIC
+
+		lda #3	; open
+		ldx #$00
+		sta ICCMD,X
+		lda # <NAME
+		sta ICBUFA,X
+		lda # >NAME
+		sta ICBUFA+1,X
+		lda #$0C
+		sta ICAX1,X
+		jsr BASEE-(GR0INITE-GR0INITS)
+
+		;lda #0
+		;sta CRITIC
+		rts
+GR0INITS
+		sei
+		sta $D5FF
+		lda TRIG3
+		sta GINTLK
+		cli
+		jsr JCIOMAIN
+		sei
+		sta $D500
+		lda TRIG3
+		sta GINTLK
+		cli
+		rts
+TNAME		dta 'E:',$9b
+GR0INITE
+
 ;-----------------------------------------------------------------------		
 ;-----------------------------------------------------------------------		
 ; P/M DATA
@@ -424,6 +484,17 @@ BEGIN
 		lda #ALLOC
 		sta MEMLO
 		;--------
+		; Clear RAM under cart
+		jsr CopyCLR
+		; Disable BASIC
+		lda PORTB
+		ora #$02
+		sta PORTB
+		lda #$01
+		sta BASICF
+
+		jsr reinit_e
+
 		; Set Menu
 		lda TMP
 		sta STORE
@@ -445,6 +516,7 @@ BEGIN
 		.print "PAGE offset ",*+1-$A000
 		ldx #0
 		stx PAGE ; <-0
+		;--------
 	
 		lda DLPTRS
 		sta STORE+3
@@ -479,17 +551,17 @@ BEGIN
 		
 		;--------	
 		; Disable BASIC
-		lda PORTB
-		ora #$02
-		sta PORTB
-		lda #$01
-		sta BASICF
-		lda #$1F
-		sta MEMTOP
-		lda #$BC
-		sta MEMTOP+1
-		lda #$C0
-		sta RAMTOP
+		;lda PORTB
+		;ora #$02
+		;sta PORTB
+		;lda #$01
+		;sta BASICF
+		;lda #$1F
+		;sta MEMTOP
+		;lda #$BC
+		;sta MEMTOP+1
+		;lda #$C0
+		;sta RAMTOP
 		lda #<ramcold
 		sta DOSVEC
 		sta DOSINI
@@ -507,9 +579,6 @@ BEGIN
 		sta ramcold,X
 		dex
 		bpl @-
-		;--------
-		; Clear RAM under cart
-		jsr CopyCLR
 		;--------
 		; Chose XEX
 		ldx #$ff
@@ -645,6 +714,7 @@ RESTORE	lda #$00
 		sta RUN
 		lda RUNAD+1
 		sta RUN+1
+BREAK
 		jmp ENTRY
 ;-----------------------------------------------------------------------		
 ; Paint colors
@@ -1208,10 +1278,10 @@ TESTSEL	lda CONSOL
 		bne CONTIN
 		ldx #(CONTIN-DISCART-1)
 @		lda DISCART,X
-		sta $0400,x
+		sta $0700,x
 		dex
 		bpl @-
-		jmp $0400
+		jmp $0700
 DISCART sta $D5FF
 		jmp RESETCD
 CONTIN	rts		
