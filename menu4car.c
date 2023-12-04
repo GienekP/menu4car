@@ -32,7 +32,9 @@ typedef unsigned char U8;
 #define MAX_ENTRIES	104
 #define MAX_ENTRIES_1	(MAX_ENTRIES+1)
 
+#if ! defined(MIN)
 #define	MIN(a,b)	((a)>(b)?(b):(a))
+#endif
 
 // those types correspond to .asm file
 #define	TYPE_XEX	0
@@ -527,12 +529,15 @@ void process_inline_params(const char * addparams) {
 		i++;
 	} 
 }
+
 unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char *path, const char *addparams,  U8 status)
 {
-static unsigned int pos=0;
-	U8 buf[FLASHMAX];
-	U8 bufcompr[FLASHMAX];
-	U8 bufcompr2[FLASHMAX];
+	static unsigned int pos=0;
+
+	static U8 bufplain[FLASHMAX];
+	static U8 bufcompr[FLASHMAX];
+	static U8 bufcompr2[FLASHMAX];
+
 	int advance=0;
 	static int osize=0;
 	static int ncsize=0;
@@ -562,7 +567,7 @@ static unsigned int pos=0;
 
 	if (status)
 	{
-		unsigned int size=loadFile(path,buf,sizeof(buf)-BANKSIZE-6);
+		unsigned int size=loadFile(path,bufplain,sizeof(bufplain)-BANKSIZE-6);
 		if (size==-1) return pos;
 
 		if (be_verbose)
@@ -571,7 +576,7 @@ static unsigned int pos=0;
 		if (filetype==TYPE_XEX) {
 			if (be_verbose)
 				printf("type XEX... ");
-			size=repairFile(buf,size);
+			size=repairFile(bufplain,size);
 			// compress file, get new size.
 			if (size) {
 				int comprsize=0;
@@ -592,7 +597,7 @@ static unsigned int pos=0;
 					 *
 					 * @return actual compressed size, or -1 for error
 					 */
-					comprsize= apultra_compress(buf,
+					comprsize= apultra_compress(bufplain,
 							bufcompr,
 							size,
 							sizeof(bufcompr),
@@ -605,7 +610,7 @@ static unsigned int pos=0;
 				}
 				if (do_compress==-1 || do_compress==2) {
 					// block compression, to do.
-					int comprsize2=compressAPLBlockByBlock(buf,size,bufcompr2);
+					int comprsize2=compressAPLBlockByBlock(bufplain,size,bufcompr2);
 
 					if (comprsize2<comprsize || do_compress>0)
 					{
@@ -618,7 +623,7 @@ static unsigned int pos=0;
 				}
 
 				#ifdef SAVERAW
-				saveRAW(buf,size);
+				saveRAW(bufplain,size);
 				#endif
 				int over=0;
 				int incrsize=0;
@@ -630,7 +635,7 @@ static unsigned int pos=0;
 				}
 				else if ((comprsize >= size)||!do_compress)
 				{
-					over=insertPos(name,data,carsize,pos,buf,size,flags);
+					over=insertPos(name,data,carsize,pos,bufplain,size,flags);
 					incrsize=size;
 				}
 
@@ -670,20 +675,20 @@ static unsigned int pos=0;
 				printf("type CAR... ");
 			switch (size){
 				case 0x410:
-						for (int i=0x10; i<0x410; i++) {buf[0x400+i]=buf[i];};
+						for (int i=0x10; i<0x410; i++) {bufplain[0x400+i]=bufplain[i];};
 						size+=0x400;
 						// no break;
 				case (0x810):
-						for (int i=0x10; i<0x810; i++) {buf[0x800+i]=buf[i];};
+						for (int i=0x10; i<0x810; i++) {bufplain[0x800+i]=bufplain[i];};
 						size+=0x800;
 						// no break;
 				case (0x1010):
-						for (int i=0x10; i<0x1010; i++) {buf[0x1000+i]=buf[i];};
+						for (int i=0x10; i<0x1010; i++) {bufplain[0x1000+i]=bufplain[i];};
 						size+=0x1000;
 						// no break;
 				case (0x2010):
 						{
-							unsigned int over=insertPos(name,data,carsize,pos,&buf[16],0x2000,flags);
+							unsigned int over=insertPos(name,data,carsize,pos,&bufplain[16],0x2000,flags);
 							if (over){
 								if (be_verbose)
 									printf("SKIPPED: \"%s\", does not fit, need %i bytes.\n",name,over);
