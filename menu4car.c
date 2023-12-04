@@ -440,7 +440,7 @@ unsigned int compressAPLBlockByBlock(U8 *bufin, unsigned int retsize, U8 * bufou
 			o+=4;
 
 			if (tsize>=32) {
-				for (j=o; j<MIN(o+tsize,FLASHMAX); j++) {bufout[j]=0;};
+				fillData(bufout,FLASHMAX,0);
 
 				csize= apultra_compress(&bufin[i],
 						&bufout[o],
@@ -543,6 +543,10 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 	static int ncsize=0;
 	int flags=0;
 
+	fillData(bufplain,FLASHMAX,0);
+	fillData(bufcompr,FLASHMAX,0);
+	fillData(bufcompr2,FLASHMAX,0);
+
 	if (data==NULL) {
 		if (be_verbose) {
 			printf("SUMMARY:\n");
@@ -609,7 +613,7 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 					choosen_compress_method=0x10;
 				}
 				if (do_compress==-1 || do_compress==2) {
-					// block compression, to do.
+
 					int comprsize2=compressAPLBlockByBlock(bufplain,size,bufcompr2);
 
 					if (comprsize2<comprsize || do_compress>0)
