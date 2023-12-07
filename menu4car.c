@@ -3,7 +3,7 @@
 /* GienekP & jhusak                                                   */
 /* (c) 2023                                                           */
 /*--------------------------------------------------------------------*/
-//#define SAVERAW
+#define SAVERAW
 #if defined(__MINGW32__) || defined(__MINGW64__)
 #define __MINGW__
 #endif
@@ -261,7 +261,7 @@ int getRoomFor8kBCart(U8 * data,int carsize, int start,int ipos, const U8 * cbuf
 }
 /*--------------------------------------------------------------------*/
 unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigned int pos,
-					const U8 *buf, unsigned int size,int flags)
+					const U8 *buf, unsigned int size,int flags, int compmeth)
 {
 	unsigned int i,ret=0;
 	unsigned int start,stop;
@@ -275,7 +275,7 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 	start=GETADDR(data,pos);
 	stop=(start+size);
 	if (be_verbose>=2)
-		printf("Pos: %d, file start: %06x, stop: %06x\n",pos,start,stop);
+		printf("Pos: %d, file start: %06x, stop: %06x, packer: %d\n",pos,start,stop,compmeth);
 
 	if (stop<=carsize) {// if fits
 
@@ -368,12 +368,16 @@ unsigned int loadFile(const char *path, U8 *buf, unsigned int sizebuf)
 }
 /*--------------------------------------------------------------------*/
 #ifdef SAVERAW
-void saveRAW(U8 *raw, unsigned int size)
+void saveRAW(const char * tname, U8 *raw, unsigned int size)
 {
 	static int licz=0;
 	char * name[1000];
 	FILE *pf;
-	sprintf(name,"RAW%d.XEX",licz++);
+	if (tname==NULL)
+		sprintf(name,"RAW%d.XEX",licz++);
+	else
+		sprintf(name,"%s",tname);
+
 	pf=fopen(name,"wb");
 	fwrite(raw,1,size,pf);
 	fclose(pf);
@@ -454,7 +458,7 @@ unsigned int compressAPLBlockByBlock(U8 *bufin, unsigned int retsize, U8 * bufou
 						tsize,
 						FLASHMAX,
 						0,
-						0,
+						255,
 						0, 
 						NULL,
 						NULL);
@@ -613,7 +617,7 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 							size,
 							sizeof(bufcompr),
 							0,
-							255,//256 - cycle buffer size as well as compression window, one byte less works
+							250,//256 - cycle buffer size as well as compression window, one byte less works
 							0, 
 							NULL,
 							NULL);
@@ -634,19 +638,20 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 				}
 
 				#ifdef SAVERAW
-				saveRAW(bufplain,size);
+				//saveRAW(bufplain,size);
+				saveRAW(name,bufcompr,comprsize);
 				#endif
 				int over=0;
 				int incrsize=0;
 				if (do_compress && ((comprsize < size) || do_compress>=1)) // forced 
 				{
 					flags|=choosen_compress_method;
-					over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags);
+					over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags,choosen_compress_method>>4);
 					incrsize=comprsize;
 				}
 				else if ((comprsize >= size)||!do_compress)
 				{
-					over=insertPos(name,data,carsize,pos,bufplain,size,flags);
+					over=insertPos(name,data,carsize,pos,bufplain,size,flags,choosen_compress_method>>4);
 					incrsize=size;
 				}
 
@@ -699,7 +704,7 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 						// no break;
 				case (0x2010):
 						{
-							unsigned int over=insertPos(name,data,carsize,pos,&bufplain[16],0x2000,flags);
+							unsigned int over=insertPos(name,data,carsize,pos,&bufplain[16],0x2000,flags,0);
 							if (over){
 								if (be_verbose)
 									printf("SKIPPED: \"%s\", does not fit, need %i bytes.\n",name,over);

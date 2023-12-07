@@ -4,53 +4,63 @@
 ; (c) 2023 GienekP, jhusak
 ;
 ;-----------------------------------------------------------------------
+; how many bytes for variables
 STORAGE = $4A
+; how many bytes for code
 CODEBUF = $1E
-ALLOC   = (CODEBUF+STORAGE)
+; where cyclic buffer (page boundary)
 CYCLBUF = $700
-BASEE   = $800+ALLOC
-BANK    = (BASEE-(DTACPYE-GETBYTE)+1)
-SRC     = (BASEE-(DTACPYE-ADRSRC)+1)
-RSRC    = (BASEE-(DTACPYE-ADRRSRC)+1)
-DST     = (BASEE-(DTACPYE-ADRDST)+1)
-CADDRESS  = ($400+(CADR-CLPRS))
-NAME	= (BASEE-(GR0INITE-TNAME))
+BASEE   = $800
+VARIABLES   = (BASEE+CODEBUF)
+FREEMEM	= BASEE+CODEBUF+STORAGE+1
 
-CBUFFER = (BASEE-(DTA256CPYE-CYCL256)+1)
-CBUFSRC = (BASEE-(DTA256CPYE-SRCP256)+1)
+; entry points
+GET_FROM_CAR	= (BASEE+GETBYTE-DTACPYS)
+PUT_RAM		= (BASEE+PUTBYTE-DTACPYS)
+GET_RAM_BYTE	= (BASEE+GETRBTE-DTACPYS)
+; parameters
+BANK    = (BASEE+GETBYTE+1-DTACPYS)
+SRC     = (BASEE+ADRSRC+1-DTACPYS)
+RSRC    = (BASEE+ADRRSRC+1-DTACPYS)
+DST     = (BASEE+ADRDST+1-DTACPYS)
 
-POS     = (BASEE-ALLOC)
-CNT     = (BASEE+1-ALLOC)
-nextbytevec = (BASEE+3-ALLOC)
-yieldvec = (BASEE+5-ALLOC)
-token	= (BASEE+7-ALLOC)
-offsetL = (BASEE+8-ALLOC)
-offsetH = (BASEE+9-ALLOC)
-EBPL    = (BASEE+$a-ALLOC)
-EBPH    = (BASEE+$b-ALLOC)
-bl      = (BASEE+$c-ALLOC)
-PAGE      = (BASEE+$d-ALLOC)
-STORE      = (BASEE+$e-ALLOC)
+CADDRESS  = (BASEE+CADR-CLPRS)
+
+NAME	= (BASEE+TNAME-GR0INITS)
+
+; entry points
+PUTCB	 = (BASEE+CYCL256-DTA256CPYS)
+GETSRCCB = (BASEE+SRCP256-DTA256CPYS)
+; parameters
+CBUFFER = (BASEE+CYCL256+1-DTA256CPYS)
+CBUFSRC = (BASEE+SRCP256+1-DTA256CPYS)
+
+
+POS     = (VARIABLES)
+CNT     = (VARIABLES+1)
+nextbytevec = (VARIABLES+3)
+yieldvec = (VARIABLES+5)
+token	= (VARIABLES+7)
+offsetL = (VARIABLES+8)
+offsetH = (VARIABLES+9)
+EBPL    = (VARIABLES+$a)
+EBPH    = (VARIABLES+$b)
+bl      = (VARIABLES+$c)
+PAGE      = (VARIABLES+$d)
+STORE      = (VARIABLES+$e)
 ; place for storing variables before call, 17 bytes
 KRPDEL	= STORE+17
 oldconsol	= STORE+18
 oldjoy	= STORE+19
 TMP	= STORE+20
-dliram = STORE + 22
+dliram	= STORE + 22
 ramcold = STORE + 22 + $20
 
-GET_FROM_CAR     = (BASEE-(DTACPYE-GETBYTE))
-PUT_RAM     = (BASEE-(DTACPYE-PUTBYTE))
-GET_RAM_BYTE     = (BASEE-(DTACPYE-GETRBTE))
+ENTRY   = (BASEE)
+RUN     = (BASEE+ADRRUN+1-ENTRYS)
+BACK    = (BASEE+ADRBCK+1-ENTRYS)
 
-PUTCB	 = (BASEE-(DTA256CPYE-CYCL256))
-GETSRCCB = (BASEE-(DTA256CPYE-SRCP256))
-
-
-RUN     = (BASEE-(ENTRYE-ADRRUN)+1)
-BACK    = (BASEE-(ENTRYE-ADRBCK)+1)
-ENTRY   = (BASEE-(ENTRYE-ENTRYS))
-RUNCART   = (BASEE-(RUNCARTE-RUNCARTS))
+RUNCART   = (BASEE)
 
 ;-----------------------------------------------------------------------
 
@@ -157,6 +167,10 @@ ramantic
 	dta $41,<antic,>antic
 
 
+; THERE IS DATA TO COPY TO RAM AREA WHEN CART IS OFF.
+; IT HANDLES SIMPLE TASKS LIKE WRITE BYTE OR INIT EXE
+; MUST BE IN CONTINUOUS MEM AND OCCUPY NOT MORE THAN PAGE OF MEMORY
+; DUE TO COPYING PROCEDURE
 ;-----------------------------------------------------------------------		
 ; $0400 CODE
 ; CLR $A000 - $BFFF
@@ -181,7 +195,7 @@ DTACPYS
 ; PUTBYTE - puts byte to ram
 ; GETRBTE - copies byte from ram to ram
 ; the goal was to keep one instance of ADRSRC and ADRDST
-
+;	.local DTACPYS,0
 GETBYTE	sta $D500 ; will be updated to bank number; entry point
 ADRSRC	lda $FFFF
 BACKC	sta $D500 
@@ -194,6 +208,7 @@ GETRBTE sta $D5FF ; entry point
 	clc
 ADRRSRC	lda $FFFF
 	bcc BACKC
+;	.endl
 
 DTACPYE
 ;-----------------------------------------------------------------------		
@@ -281,7 +296,7 @@ CopyCLR	ldx #(CLPRE-CLPRS-1)
 ; Copy Copy to Stack
 CopyCPY	ldx #(DTACPYE-DTACPYS)
 @		lda DTACPYS-1,X
-		sta BASEE-(DTACPYE-DTACPYS+1),X
+		sta BASEE-1,X
 		dex
 		bne @-
 		rts
@@ -290,7 +305,7 @@ CopyCPY	ldx #(DTACPYE-DTACPYS)
 ; Copy Copy256 to Stack
 CopyCPY256	ldx #(DTA256CPYE-DTA256CPYS)
 @		lda DTA256CPYS-1,X
-		sta BASEE-(DTA256CPYE-DTA256CPYS+1),X
+		sta BASEE-1,X
 		dex
 		bne @-
 		rts
@@ -417,7 +432,7 @@ keytbllen	=	*-KEYTBLE
 reinit_e
 		ldx #(GR0INITE-GR0INITS)
 @		lda GR0INITS-1,X
-		sta BASEE-(GR0INITE-GR0INITS)-1,X
+		sta BASEE-1,X
 		dex
 		bne @-
 
@@ -443,7 +458,7 @@ reinit_e
 		sta ICBUFA+1,X
 		lda #$0C
 		sta ICAX1,X
-		jsr BASEE-(GR0INITE-GR0INITS)
+		jsr BASEE
 
 		;lda #0
 		;sta CRITIC
@@ -480,9 +495,9 @@ GR0INITE
 BEGIN
 		jsr TESTSEL
 		; MEMLO
-		lda #$08
+		lda #>FREEMEM
 		sta MEMLO+1
-		lda #ALLOC
+		lda #<FREEMEM
 		sta MEMLO
 		;--------
 		; Clear RAM under cart
@@ -1260,14 +1275,14 @@ CmpDst		lda DST
 ; Copy Entry to Stack
 CopyENT	ldx #(ENTRYE-ENTRYS)
 @		lda ENTRYS-1,X
-		sta BASEE-(ENTRYE-ENTRYS+1),X
+		sta BASEE-1,X
 		dex
 		bne @-
 		rts
 ;-----------------------------------------------------------------------		
 CopyRunCart	ldx #(RUNCARTE-RUNCARTS)
 @		lda RUNCARTS-1,x
-		sta BASEE-(RUNCARTE-RUNCARTS+1),X
+		sta BASEE-1,X
 		dex
 		bne @-
 		rts
