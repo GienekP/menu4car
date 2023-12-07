@@ -166,7 +166,7 @@ ramantic
 	:25 dta	$02
 	dta $41,<antic,>antic
 
-
+STARTRAMDATA
 ; THERE IS DATA TO COPY TO RAM AREA WHEN CART IS OFF.
 ; IT HANDLES SIMPLE TASKS LIKE WRITE BYTE OR INIT EXE
 ; MUST BE IN CONTINUOUS MEM AND OCCUPY NOT MORE THAN PAGE OF MEMORY
@@ -188,14 +188,13 @@ CLPRS		; a=0; y=0
 CLPRE		
 ;-----------------------------------------------------------------------		
 ; RAM CODE FOR NORMAL AND BLOCK COMPRESSED
-DTACPYS
 ; length 28
 ; THREE entry points:
 ; GETBYTE - gets byte from cart or whatever
 ; PUTBYTE - puts byte to ram
 ; GETRBTE - copies byte from ram to ram
 ; the goal was to keep one instance of ADRSRC and ADRDST
-;	.local DTACPYS,0
+DTACPYS
 GETBYTE	sta $D500 ; will be updated to bank number; entry point
 ADRSRC	lda $FFFF
 BACKC	sta $D500 
@@ -208,12 +207,9 @@ GETRBTE sta $D5FF ; entry point
 	clc
 ADRRSRC	lda $FFFF
 	bcc BACKC
-;	.endl
-
 DTACPYE
 ;-----------------------------------------------------------------------		
 ; RAM CODE FOR COMPRESSED 256-byte Windowed
-DTA256CPYS
 ; length 28
 ; FOUR entry points:
 ; GETBYTE - gets byte from cart or whatever
@@ -223,6 +219,7 @@ DTA256CPYS
 ; names are prefixed to avoid double declaration
 ; first code part must be a duplicate of previous block
 ; cyclic buffer procs must fit into place of GETRBTE proc and substitutes it.
+DTA256CPYS
 _GETBYTE	sta $D500 ; will be updated to bank number; entry point
 _ADRSRC	lda $FFFF
 _BACKC	sta $D500 
@@ -235,8 +232,6 @@ CYCL256 sta CYCLBUF ; entry point
 	rts
 SRCP256	lda CYCLBUF ; entry point
 	rts
-	nop	;IMPORTANT to get the same size as previous code section
-
 DTA256CPYE
 ;--------------------------------------------
 ; length 20
@@ -268,44 +263,45 @@ RUNCARTS
 
 ;s		beq s
 		jmp RESETCD
-
 RUNCARTE
+
+DISCARTS sta $D5FF
+		jmp RESETCD
+DISCARTE
+; END OF CONTINUOUS MEM TO BE STORED IN RAM
+		.print "RAMDATALEN: ",*-STARTRAMDATA
 ;-----------------------------------------------------------------------		
 ; Copy Clear to $0400
-CopyCLR	ldx #(CLPRE-CLPRS-1)
-@		lda CLPRS,X
-		sta $0400,X
-		dex
-		bpl @-
+CopyCLR		ldx #(CLPRE-CLPRS-1)
+		ldy #(CLPRE-STARTRAMDATA)
+		jsr CopyUniY
 		lda #0
 		ldy #1
 		sty CRITIC
 		tay
-		jsr $0400	
+		jsr BASEE
 		ldy TRIG3
 		sty GINTLK
+		lda #0
 		sta CRITIC
-		ldx #(CLPRE-CLPRS-1)
-@		lda #$00
-		sta $0400,X
-		dex
-		bpl @-		
 		rts
-
+CopyCPY
+		ldx #(DTACPYE-DTACPYS)
+		ldy #(DTACPYE-STARTRAMDATA)
+		bne CopyUniY
+CopyCPY256
+		ldx #(DTA256CPYE-DTA256CPYS)
+		ldy #(DTA256CPYE-STARTRAMDATA)
+		bne CopyUniY
+CopyENT
+		ldx #(ENTRYE-ENTRYS)
+		ldy #(ENTRYE-STARTRAMDATA)
 ;-----------------------------------------------------------------------		
-; Copy Copy to Stack
-CopyCPY	ldx #(DTACPYE-DTACPYS)
-@		lda DTACPYS-1,X
+; copy Y-offset x bytes to BASEE
+CopyUniY
+@		lda STARTRAMDATA-1,Y
 		sta BASEE-1,X
-		dex
-		bne @-
-		rts
-		
-;-----------------------------------------------------------------------		
-; Copy Copy256 to Stack
-CopyCPY256	ldx #(DTA256CPYE-DTA256CPYS)
-@		lda DTA256CPYS-1,X
-		sta BASEE-1,X
+		dey
 		dex
 		bne @-
 		rts
@@ -493,7 +489,15 @@ GR0INITE
 ;
 
 BEGIN
-		jsr TESTSEL
+		; Test /Select/ and Disable Cartridge
+		lda CONSOL
+		and #$02
+		bne CONTIN
+		ldx #(DISCARTE-DISCARTS)
+		ldy #(DISCARTE-STARTRAMDATA)
+		jsr CopyUniY
+		jmp $0700
+CONTIN		
 		; MEMLO
 		lda #>FREEMEM
 		sta MEMLO+1
@@ -950,7 +954,9 @@ LOADATR
 LOADBASIC
 		jmp	RESETCD
 LOADCAR		; 8 kb car area straight mapping
-		jsr	CopyRunCart
+		ldx #(RUNCARTE-RUNCARTS)
+		ldy #(RUNCARTE-STARTRAMDATA)
+		jsr	CopyUniY
 		ldx	POS
 		lda	tabbnk,X ; bank
 		jmp	RUNCART
@@ -1272,35 +1278,6 @@ CmpDst		lda DST
 @		rts
 
 ;-----------------------------------------------------------------------		
-; Copy Entry to Stack
-CopyENT	ldx #(ENTRYE-ENTRYS)
-@		lda ENTRYS-1,X
-		sta BASEE-1,X
-		dex
-		bne @-
-		rts
-;-----------------------------------------------------------------------		
-CopyRunCart	ldx #(RUNCARTE-RUNCARTS)
-@		lda RUNCARTS-1,x
-		sta BASEE-1,X
-		dex
-		bne @-
-		rts
-
-;-----------------------------------------------------------------------		
-; Test /Select/ and Disable Cartridge
-TESTSEL	lda CONSOL
-		and #$02
-		bne CONTIN
-		ldx #(CONTIN-DISCART-1)
-@		lda DISCART,X
-		sta $0700,x
-		dex
-		bpl @-
-		jmp $0700
-DISCART sta $D5FF
-		jmp RESETCD
-CONTIN	rts		
 ;-----------------------------------------------------------------------
 		icl "apldecr_zp.asm"
 		
