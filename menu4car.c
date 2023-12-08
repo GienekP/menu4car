@@ -3,7 +3,7 @@
 /* GienekP & jhusak                                                   */
 /* (c) 2023                                                           */
 /*--------------------------------------------------------------------*/
-#define SAVERAW
+//#define SAVERAW
 #if defined(__MINGW32__) || defined(__MINGW64__)
 #define __MINGW__
 #endif
@@ -639,8 +639,11 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 
 				#ifdef SAVERAW
 				//saveRAW(bufplain,size);
-				saveRAW(name,bufcompr,comprsize);
-				#endif
+				if (!do_compress)
+					saveRAW(name,bufplain,size);
+				else
+					saveRAW(name,bufcompr,comprsize);
+#endif
 				int over=0;
 				int incrsize=0;
 				if (do_compress && ((comprsize < size) || do_compress>=1)) // forced 

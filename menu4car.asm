@@ -67,7 +67,7 @@ RUNCART   = (BASEE)
 
 ;ZPALLOC = $24
 ;TMP     = $00
-CASINI  = $02 
+CASINI  = $02
 WARMST  = $08
 BOOTQ   = $09
 DOSVEC  = $0A
@@ -585,12 +585,12 @@ CONTIN
 		lda #<ramcold
 		sta DOSVEC
 		sta DOSINI
-		sta CASINI	
+		;sta CASINI
 		lda #>ramcold
 		sta DOSVEC+1
 		sta DOSINI+1
-		sta CASINI+1
-		lda #$03
+		;sta CASINI+1
+		lda #$01
 		sta BOOTQ
 		lda #$00
 		sta COLDST
