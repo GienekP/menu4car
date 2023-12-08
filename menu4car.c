@@ -1117,6 +1117,7 @@ int main( int argc, char* argv[] )
 		usage();
 	};
 
+	char outfilearr[1024];
 	char * logofilepath=NULL;
 	char * colortablefile=NULL;
 	char * outfile=NULL;
@@ -1227,6 +1228,20 @@ int main( int argc, char* argv[] )
 		else
 			txtfilename=argv[i];
 		i++;
+	}
+
+	if (outfile==NULL) {
+		char * c=strrchr(txtfilename,'.');
+		if (!c) {
+			strncpy(outfilearr,txtfilename,1018);
+			outfilearr[1018]='\0'; // space for extension
+		}
+		else
+		{
+			strncpy(outfilearr,txtfilename,c-txtfilename);
+			outfilearr[c-txtfilename]='\0';
+		}
+		outfile=outfilearr;
 	}
 
 	if (txtfilename)
