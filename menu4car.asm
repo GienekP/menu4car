@@ -734,7 +734,7 @@ RESTORE	lda #$00
 		sta RUN
 		lda RUNAD+1
 		sta RUN+1
-BREAK
+;BREAK
 		jmp ENTRY
 ;-----------------------------------------------------------------------		
 ; Paint colors
@@ -993,10 +993,11 @@ ERRORWM	jmp RESETCD 	; Warm Reset if ERROR
 LOOP	jsr IncSrc
 		beq ERRORWM
 		
-READBLC	jsr GET_FROM_CAR			; Read LSB
+READBLC		jsr GET_FROM_CAR			; Read LSB
 		STA DST
 		jsr IncSrc		; SRC++
 		beq ERRORWM		; ERROR NoDATA
+
 		jsr GET_FROM_CAR			; Read HSB
 		sta DST+1
 		jsr IncSrc
@@ -1017,7 +1018,9 @@ DECRTRANSF
 		; decomp stuff
 		jsr aPL_depack_blk
 		; compressed blocks never contain init/run addresses
-		jmp READBLC
+		jsr CheckSrc
+		bne READBLC
+		rts
 
 TRANSF		jsr GET_FROM_CAR			; Read BYTE
 		;sta COLBAK		; Write to "noise"
@@ -1130,12 +1133,13 @@ CREADBLC	GET_COMP_BYTE			; Read LSB
 		sta CNT			; Set Last Write LSB
 
 		GET_COMP_BYTE
-		bcs CERRORWM	
+		bcs CERRORWM
 		sta CNT+1		; Set Last Write MSB
 		
 CTRANSF		GET_COMP_BYTE			; Read BYTE
 		nop
 		bcs CERRORWM		; ERROR NoDATA
+
 		;sta COLBAK		; Write to "noise"
 		jsr PUT_RAM			; Write BYTE
 		jsr CmpDst		; Check Destination
@@ -1147,11 +1151,12 @@ CTRANSF		GET_COMP_BYTE			; Read BYTE
 @
 		bne	CTRANSF		; Repeat transfer byte
 		
-CENDBLK 
+CENDBLK
 		lda INITAD		; End DOS block
 		and  INITAD+1
 		cmp #$FF		; New INITAD?
 		bne CINITPART		; Run INIT Procedure
+
 		jmp CREADBLC		; No EOF read next block
 		
 CINITPART
@@ -1234,14 +1239,14 @@ SETPOSSRC
 ;-----------------------------------------------------------------------		
 ; Inc Source
 IncSrc		inc SRC
-		bne @+
+		bne CheckSrc
 		inc SRC+1
 		bit SRC+1
-		bvc @+
+		bvc CheckSrc
 		lda #$A0
 		sta SRC+1
 		inc BANK
-@
+CheckSrc
 		; Cmp Source
 		ldx POS
 		lda tabalo+1,X

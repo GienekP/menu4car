@@ -53,6 +53,7 @@ clean:
 	rm -f menu4car.exe
 	rm -f *.o
 	rm -f *.lab
+	rm -f menu4car.bin
 	rm -f menu4car.arm64
 	rm -f menu4car.x86_64
 	$(MAKE) -f Makefile.menu4car -C apultra clean SUF=.arm64
