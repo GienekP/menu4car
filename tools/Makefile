@@ -12,4 +12,4 @@ all: $(BINS)
 	$(CC) $(CFLAGS) -o $(BIN)/$@ $<
 
 clean:
-	$(RM) $(BIN)/*
+	$(RM) $(BIN)/$(BINS)
