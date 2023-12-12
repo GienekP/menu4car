@@ -30,10 +30,10 @@ $(MAIN)$(SUF).o: $(MAIN).c $(MAIN).h
 $(MAIN).h : $(MAIN).bin
 	xxd -i -c 16 "$<" "$@"
 
-test : $(MAIN).asm apldecr_zp.asm
+test : $(MAIN).asm apldecr.asm
 	mads "$<" -t -o:menu4car.obx | sed "s/\\$$//g"
 
-$(MAIN).bin : $(MAIN).asm apldecr_zp.asm
+$(MAIN).bin : $(MAIN).asm apldecr.asm
 	mads "$<" -t -l -o:"$@" | sed "s/\\$$//g" | tee |  grep "#define" >menu4car_interface.h
 
 libapultra$(SUF).a:

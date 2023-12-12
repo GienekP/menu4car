@@ -68,8 +68,8 @@ plus2		inx
 		bne	plus1
 		iny
 plus1		inx
-		bne	normal1
-		iny
+		;bne	normal1
+		;iny
 normal1
 lenffff		iny
 		sec
@@ -225,8 +225,8 @@ plus2		inx
 		bne	plus1
 		iny
 plus1		inx
-		bne	normal1
-		iny
+		;bne	normal1
+		;iny
 normal1
 lenffff		iny
 		sec
