@@ -1,9 +1,3 @@
 [submodule "apultra"]
 	path = apultra
 	url = https://github.com/emmanuel-marty/apultra.git
-[submodule "xxd"]
-	path = xxd
-	url = https://github.com/ConorOG/xxd.git
-[submodule "ZX0"]
-	path = ZX0
-	url = https://github.com/einar-saukas/ZX0.git
