@@ -384,47 +384,66 @@ void saveRAW(const char * tname, U8 *raw, unsigned int size)
 };
 #endif
 /*--------------------------------------------------------------------*/
-unsigned int repairFile(U8 *buf, unsigned int size)
+int repairFile(U8 *buf, int size)
 {
-	unsigned int i=0,j,first=0xFFFF,run=0,init=0,ret=size;
-	if (GETW(buf,0)==0xFFFF )
+	int i=0,j,first=0xFFFF,run=0,init=0,ret=size;
+
+#define BYTES_IN_BUF(i,ret) ((ret)-(i))
+
+	
+	if ((ret>2) && GETW(buf,0)==0xFFFF )
 	{
+		if (be_verbose>=3) fprintf(stderr,"Atari binary file header read: 0xff 0xff\n");
 		unsigned int a,b,start,stop;
 		i+=2;
-		while (i<ret)
+		while (BYTES_IN_BUF(i,ret)>=4)
 		{
-			if (GETW(buf,i)==0xFFFF)
-			{
-				for (j=i; j<ret; j++) {buf[j]=buf[j+2];};
-				ret-=2;
-			};
-			start = GETW(buf,i);
-			stop  = GETW(buf,i+2);
-			if (start>stop) {ret=i;}
-			else
-			{
+			while (BYTES_IN_BUF(i,ret)>=4) {
+				if  (GETW(buf,i)==0xFFFF)
+				{
+					if (be_verbose>=3) fprintf(stderr,"uneven binary file header read: 0xff 0xf; removing.\n");
+					for (j=i; j<ret; j++) {buf[j]=buf[j+2];};
+					ret-=2;
+				}
+				else
+					break;
+			}
+
+			if (BYTES_IN_BUF(i,ret)>=4) {
+				start = GETW(buf,i);
+				if (be_verbose>=3) fprintf(stderr,"BLOCK: %04x-",start);
+				stop  = GETW(buf,i+2);
+				if (be_verbose>=3) fprintf(stderr,"%04x\n",stop);
 				i+=4;
-				if (first==0xFFFF) {first=start;};
-				if ((start<=0x02E0) && (stop>=0x02E1)) {run=1;};
-				if ((start<=0x02E2) && (stop>=0x02E3)) {init=1;};
-				i+=(1+stop-start);
-			};
+			}
+			else
+				return 0;
+
+			if (start>stop)
+				return 0;
+
+			if (BYTES_IN_BUF(i,ret)<1+stop-start) return 0;
+			if (first==0xFFFF) {first=start;};
+			if ((start<=0x02E0) && (stop>=0x02E1)) { run=1; };
+			if ((start<=0x02E2) && (stop>=0x02E3)) {init=1;};
+			i+=(1+stop-start);
 		};
+		if (BYTES_IN_BUF(i,ret)>0) return 0;
 
 		if (!init && !run)
 		{
+			if (be_verbose>=3) fprintf(stderr,"Added not-existent RUN: %04x\n",first);
 			U8 runad[6]={0xE0, 0x02, 0xE1, 0x02, 0xFF, 0xFF};
 			runad[4]=(first&0xFF);
 			runad[5]=((first>>8)&0xFF);
 			for (i=0; i<6; i++) {buf[ret+i]=runad[i];};
 			ret+=6;
+			return ret;
 		};
 	}
 	else
-	if (buf[0]==0xFF)
-	{
-		ret=0;
-	};
+		return 0;
+
 	return ret;
 }
 /*--------------------------------------------------------------------*/
@@ -583,7 +602,7 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 	if (status)
 	{
 		unsigned int size=loadFile(path,bufplain,sizeof(bufplain)-BANKSIZE-6);
-		if (size==-1) return pos;
+		if (size<=0) return pos;
 
 		if (be_verbose)
 			printf("%s length: %d ",path,size);
@@ -686,6 +705,10 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 					ncsize+=size;
 					advance=1;
 				}
+			}
+			else {
+				fprintf(stderr,"Error in xex file '%s'\n",path);
+				errorcounter++;
 			}
 		}
 		else if (filetype==TYPE_CAR)
@@ -804,7 +827,7 @@ U8 readLine(FILE *pf,char *name, char *path, char *add)
 	return status;
 }
 /*--------------------------------------------------------------------*/
-void addData(U8 *data, unsigned int carsize, const char *filemenu)
+int addData(U8 *data, unsigned int carsize, const char *filemenu)
 {
 	char name[NAMELEN],path[PATHLEN],addparams[PARAMSLEN];
 	FILE *pf;
@@ -833,13 +856,14 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 				fprintf(stderr,"BAD Line read num: %d, '%s','%s','%s'\n",i,name,path,addparams);
 				errorcounter++;
 			}
-			if (i>0) o++; // begin counting aftter some files added
+			if (i>0) o++; // begin counting after some files added
 		};
 		// output summary info
 		addPos(0,carsize,0,0,0,0);
-		for (i=0; i<MAX_ENTRIES+1; i++)
+		int j;
+		for (j=0; j<MAX_ENTRIES+1; j++)
 		{
-			int DA_POS_OFFSET=DATAARRAY_OFFSET+i;
+			int DA_POS_OFFSET=DATAARRAY_OFFSET+j;
 			// update hi byte of every entry
 			if (data[DA_POS_OFFSET]!=0xFF) {data[DA_POS_OFFSET+3*MAX_ENTRIES_1]|=0xA0;};
 		};
@@ -848,7 +872,9 @@ void addData(U8 *data, unsigned int carsize, const char *filemenu)
 	else
 	{
 		fprintf(stderr,"Open Error \"%s\".\n",filemenu);
+		return 0;
 	};
+	return i;
 };
 #define ERROR(str) {fprintf(stderr,str); exit(1);}
 /*--------------------------------------------------------------------*/
@@ -1065,7 +1091,7 @@ void addPages(U8* data)
 }
 
 /*--------------------------------------------------------------------*/
-void menu4car(const char * filemenu, const char * logo, const char * colortablefile, const char * fontpath, const char * carname, int cart_size, int cart_size_physical, int default_do_compress)
+int menu4car(const char * filemenu, const char * logo, const char * colortablefile, const char * fontpath, const char * carname, int cart_size, int cart_size_physical, int default_do_compress)
 {
 	U8 cardata[FLASHMAX];
 	fillData(cardata, FLASHMAX, 0xFF);
@@ -1073,30 +1099,41 @@ void menu4car(const char * filemenu, const char * logo, const char * colortablef
 	addLogo(cardata,logo,256*16,8);
 	addCTable(cardata,colortablefile);
 	addFont(cardata,fontpath);
-	addData(cardata,cart_size,filemenu);
-	addPages(cardata);
+	int c;
+	if (c=addData(cardata,cart_size,filemenu)) {
 
-	int output_type=checkTypeByPath(carname);
-	if (output_type==TYPE_UNKNOWN){
-		char fname [1024];
-		sprintf(fname,"%s.xex",carname);
-		saveCAR(fname,cardata,cart_size,cart_size_physical);
-		sprintf(fname,"%s.car",carname);
-		saveCAR(fname,cardata,cart_size,cart_size_physical);
-		sprintf(fname,"%s.bin",carname);
-		saveCAR(fname,cardata,cart_size,cart_size_physical);
+		addPages(cardata);
+
+		int output_type=checkTypeByPath(carname);
+
+		if (output_type==TYPE_UNKNOWN){
+			char fname [1024];
+			sprintf(fname,"%s.xex",carname);
+			saveCAR(fname,cardata,cart_size,cart_size_physical);
+			sprintf(fname,"%s.car",carname);
+			saveCAR(fname,cardata,cart_size,cart_size_physical);
+			sprintf(fname,"%s.bin",carname);
+			saveCAR(fname,cardata,cart_size,cart_size_physical);
+		}
+		else
+			saveCAR(carname,cardata,cart_size,cart_size_physical);
 	}
 	else
-	saveCAR(carname,cardata,cart_size,cart_size_physical);
+	{
+		fprintf(stderr,"No files added - no car file created.\n");
+		return 0;
+	}
+	return c;
+
 }
 void usage() {
-		printf("Menu4CAR - ver: %s\n",__DATE__);
-		printf("(c) GienekP\n\n");
-		printf("usage:\nmenu4car menu.txt <options>\n");
-		printf("\nOptions:\n");
-		printf("	-p <path> - picdata path (default Menu4Car, built in), raw 8-bit b&w 512 byte length\n");
-		printf("	-t <path> - color table path (default rainbow, built in), 16 byte length of atari colors\n");
-		printf("	-o <path> - outputcar path (filetype: <>.car, <>.bin or <>.exe or <>.xex; no ext to save all .car, .bin and .xex.\n");
+	printf("Menu4CAR - ver: %s\n",__DATE__);
+	printf("(c) GienekP\n\n");
+	printf("usage:\nmenu4car menu.txt <options>\n");
+	printf("\nOptions:\n");
+	printf("	-p <path> - picdata path (default Menu4Car, built in), raw 8-bit b&w 512 byte length\n");
+	printf("	-t <path> - color table path (default rainbow, built in), 16 byte length of atari colors\n");
+	printf("	-o <path> - outputcar path (filetype: <>.car, <>.bin or <>.exe or <>.xex; no ext to save all .car, .bin and .xex.\n");
 		printf("	-c <compression> - forced compression method 0/1/2/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
 		printf("	-f <path> - path to 1024 byte length font file\n");
 		printf("	-s <size> - logical cart size: 32/64/128/256/512/1024, default 1024\n");
@@ -1244,11 +1281,12 @@ int main( int argc, char* argv[] )
 		outfile=outfilearr;
 	}
 
+	int res=0;
 	if (txtfilename)
-		menu4car(txtfilename,logofilepath, colortablefile, fontpath, outfile, cart_size, cart_size_physical, default_do_compress);
+		res=menu4car(txtfilename,logofilepath, colortablefile, fontpath, outfile, cart_size, cart_size_physical, default_do_compress);
 	if (errorcounter>0)
 		fprintf(stderr,"Warning: %d input file errors encountered.\n",errorcounter);
 
-	return 0;
+	return !res;
 }
 /*--------------------------------------------------------------------*/

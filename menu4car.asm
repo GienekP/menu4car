@@ -9,8 +9,8 @@ STORAGE = $4A
 ; how many bytes for code
 CODEBUF = $1E
 ; where cyclic buffer (page boundary)
-CYCLBUF = $700
-BASEE   = $800
+BASEE   = $700
+CYCLBUF = $800
 VARIABLES   = (BASEE+CODEBUF)
 FREEMEM	= BASEE+CODEBUF+STORAGE+1
 
@@ -1010,7 +1010,10 @@ READBLC		jsr GET_FROM_CAR			; Read LSB
 		jsr GET_FROM_CAR
 		sta CNT+1		; Set Last Write MSB
 		jsr IncSrc
-		beq ERRORWM	
+		beq ERRORWM
+		lda DST
+		ora DST
+		beq TRANSF
 		lda CNT
 		ora CNT+1
 		bne TRANSF

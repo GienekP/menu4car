@@ -9,10 +9,10 @@ MNAME = $(shell uname -m)
 $(MAIN): $(MAIN).x86_64 $(MAIN).arm64
 	lipo -create -output $@ $^
 
-$(MAIN).x86_64:
+$(MAIN).x86_64: $(MAIN).c $(MAIN).h
 	$(MAKE) ARCH="-target x86_64-apple-macos10.6" SUF=.x86_64 
 
-$(MAIN).arm64:
+$(MAIN).arm64: $(MAIN).c $(MAIN).h
 	$(MAKE) ARCH="-target arm64-apple-macos11" SUF=.arm64
 
 else
