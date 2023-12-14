@@ -53,8 +53,8 @@ KRPDEL	= STORE+17
 oldconsol	= STORE+18
 oldjoy	= STORE+19
 TMP	= STORE+20
-dliram	= STORE + 22
-ramcold = STORE + 22 + $20
+ramcold	= STORE + 22
+dliram = STORE + 28 ; 32 bytes long
 
 ENTRY   = (BASEE)
 RUN     = (BASEE+ADRRUN+1-ENTRYS)

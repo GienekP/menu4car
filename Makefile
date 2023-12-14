@@ -60,4 +60,6 @@ clean:
 	$(MAKE) -f Makefile.menu4car -C apultra clean SUF=.x86_64
 	$(MAKE) -f Makefile -C apultra clean
 
+remake: clean
+	$(MAKE) -j 12
 	

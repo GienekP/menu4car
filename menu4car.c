@@ -367,8 +367,7 @@ unsigned int loadFile(const char *path, U8 *buf, unsigned int sizebuf)
 	return size;
 }
 /*--------------------------------------------------------------------*/
-#ifdef SAVERAW
-void saveRAW(const char * tname, U8 *raw, unsigned int size)
+void saveFile(const char * tname, U8 *raw, unsigned int size)
 {
 	static int licz=0;
 	char * name[1000];
@@ -382,7 +381,6 @@ void saveRAW(const char * tname, U8 *raw, unsigned int size)
 	fwrite(raw,1,size,pf);
 	fclose(pf);
 };
-#endif
 /*--------------------------------------------------------------------*/
 int repairFile(U8 *buf, int size)
 {
@@ -469,7 +467,8 @@ unsigned int compressAPLBlockByBlock(U8 *bufin, unsigned int retsize, U8 * bufou
 			i+=4;
 			o+=4;
 
-			if (tsize>=32) {
+#define COMPRESSION_THRESHOLD	32
+			if (tsize>=COMPRESSION_THRESHOLD) {
 				for (j=o; j<MIN(o+tsize,FLASHMAX); j++) {bufout[j]=0;};
 
 				csize= apultra_compress(&bufin[i],
@@ -481,9 +480,9 @@ unsigned int compressAPLBlockByBlock(U8 *bufin, unsigned int retsize, U8 * bufou
 						0, 
 						NULL,
 						NULL);
-				//saveRAW(&bufout[o],csize);
+				//saveFile(&bufout[o],csize);
 			}
-			if (tsize>=32 && csize<tsize && !initrun) {
+			if (tsize>=COMPRESSION_THRESHOLD && csize<tsize && !initrun) {
 				PUTW(bufout,o-2,0);
 				o+=csize;
 				// ok, compressed in place
@@ -493,6 +492,7 @@ unsigned int compressAPLBlockByBlock(U8 *bufin, unsigned int retsize, U8 * bufou
 				for (j=i; j<i+tsize; j++) {bufout[o++]=bufin[j];};
 			}
 			i+=tsize;
+
 		};
 		retsize=o;
 	}
@@ -657,11 +657,11 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 				}
 
 				#ifdef SAVERAW
-				//saveRAW(bufplain,size);
+				//saveFile(bufplain,size);
 				if (!do_compress)
-					saveRAW(name,bufplain,size);
+					saveFile(name,bufplain,size);
 				else
-					saveRAW(name,bufcompr,comprsize);
+					saveFile(name,bufcompr,comprsize);
 #endif
 				int over=0;
 				int incrsize=0;
@@ -838,7 +838,7 @@ int addData(U8 *data, unsigned int carsize, const char *filemenu)
 	{
 		i=0;
 		int o=0;
-		while (i<MAX_ENTRIES && o<130)
+		while (i<MAX_ENTRIES && o<200)
 		{
 			U8 status=readLine(pf,name,path,addparams);
 			if (strlen(path)>0 && strlen(name)>0) {
@@ -1136,16 +1136,16 @@ void usage() {
 	printf("	-p <path> - picdata path (default Menu4Car, built in), raw 8-bit b&w 512 byte length\n");
 	printf("	-t <path> - color table path (default rainbow, built in), 16 byte length of atari colors\n");
 	printf("	-o <path> - outputcar path (filetype: <>.car, <>.bin or <>.exe or <>.xex; no ext to save all .car, .bin and .xex.\n");
-		printf("	-c <compression> - forced compression method 0/1/2/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
-		printf("	-f <path> - path to 1024 byte length font file\n");
-		printf("	-s <size> - logical cart size: 32/64/128/256/512/1024, default 1024\n");
-		printf("	-S <size> - physical cart size: 32/64/128/256/512/1024, default as logical; if set must be after -s\n");
-		printf("	-v - be verbose\n");
-		printf("	-? - this help\n\n");
+	printf("	-c <compression> - forced compression method 0/1/2/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
+	printf("	-f <path> - path to 1024 byte length font file\n");
+	printf("	-s <size> - logical cart size: 32/64/128/256/512/1024, default 1024\n");
+	printf("	-S <size> - physical cart size: 32/64/128/256/512/1024, default as logical; if set must be after -s\n");
+	printf("	-v - be verbose\n");
+	printf("	-? - this help\n\n");
 #ifndef __MINGW__
-		exit(EX_USAGE);
+	exit(EX_USAGE);
 #else
-		exit(64);
+	exit(64);
 #endif
 }
 /*--------------------------------------------------------------------*/
