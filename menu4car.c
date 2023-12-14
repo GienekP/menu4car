@@ -708,6 +708,7 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 			}
 			else {
 				fprintf(stderr,"Error in xex file '%s'\n",path);
+				printf("\n");
 				errorcounter++;
 			}
 		}
@@ -837,7 +838,7 @@ int addData(U8 *data, unsigned int carsize, const char *filemenu)
 	{
 		i=0;
 		int o=0;
-		while (i<MAX_ENTRIES && o<200)
+		while (i<MAX_ENTRIES && o<130)
 		{
 			U8 status=readLine(pf,name,path,addparams);
 			if (strlen(path)>0 && strlen(name)>0) {
@@ -874,6 +875,7 @@ int addData(U8 *data, unsigned int carsize, const char *filemenu)
 		fprintf(stderr,"Open Error \"%s\".\n",filemenu);
 		return 0;
 	};
+
 	return i;
 };
 #define ERROR(str) {fprintf(stderr,str); exit(1);}
