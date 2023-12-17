@@ -2,10 +2,12 @@
 
 This utility let's you create a MaxFlash/JCart cart image with your favourite Atari 8-bit games.
 Also, XEX flasher ready to write do some media may be created. No more additional tools!
+In addition XEX flasher may be created for any .car or .bin file.
 
 Input file types handled:
 - standard Atari Dos binary (extensions: .exe, .xex, .obj, .com eithercase)
 - 1kB, 2kB, 4kB or 8kB .car standard cartridge image files (extension: .car eithercase)
+- any cartridge file for xex flasher generation.
 
 The example file menu4car.txt contains an input in form of sort of csv file, separated by "|" char. It is an UTF-8 encoded file with Polish diacritical letters handling as well as some German letters too.
 
@@ -39,6 +41,11 @@ and outcartimage.xex is a flasher application ready to be placed on the media re
     ./menu4car menu4car.txt -o outcartimage
 
 and outcartimage.xex, outcartimage.car and outcartimage.bin files are written.
+
+    ./menu4car -b cartimage.car -o cartimageflasher.xex
+
+and flasher for cartimage.car is written.
+
 
 Full list of parameteres:
 
@@ -100,4 +107,8 @@ Optionally go to the "tools" tirectory and type "make" to build homesoft atr con
 
 The main author of main functionality: menu, xex reading - GienekP
 
-The add-ons: cmdline arguments, optimization, compression, cartridge handling and 4-page navigation - Jakub Husak
+The add-ons: cmdline arguments, optimization, compression, cartridge handling, 4-page navigation, xex flasher generation - Jakub Husak
+
+The apultra decompressor by xxl (incompatibility of apultra compressed output with aplib spec fixed by him, also)
+
+The apultra compressor by Emmanuel Marty.

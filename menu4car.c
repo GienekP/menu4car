@@ -1093,15 +1093,44 @@ void addPages(U8* data)
 }
 
 /*--------------------------------------------------------------------*/
+int carbintoflasherxex(const char * carbinfile, const char * carname, int cart_size_physical)
+{
+	static U8 cardata[FLASHMAX+16];
+	int output_type=checkTypeByPath(carname);
+	if (output_type!=TYPE_XEX){
+		fprintf(stderr,"bad output file type (expected ext: (xex|exe|obx|com)) - no flasher created.\n");
+		return 0;
+	}
+	int input_type=checkTypeByPath(carbinfile);
+
+	if (!(input_type==TYPE_CAR || input_type==TYPE_BIN)) {
+		fprintf(stderr,"bad output file type (expected ext: (xex|exe|obx|com)) - no flasher created.\n");
+		return 0;
+	}
+
+	int size=loadFile(carbinfile,cardata,FLASHMAX+16);
+
+	U8 * cb=cardata;
+	if (input_type==TYPE_CAR) {
+		cb+=16;
+		size-=16;
+	}
+
+	// save xex flasher
+	saveCAR(carname,cb,size,cart_size_physical);
+
+	return 1;
+}
+/*--------------------------------------------------------------------*/
 int menu4car(const char * filemenu, const char * logo, const char * colortablefile, const char * fontpath, const char * carname, int cart_size, int cart_size_physical, int default_do_compress)
 {
-	U8 cardata[FLASHMAX];
+	static U8 cardata[FLASHMAX];
 	fillData(cardata, FLASHMAX, 0xFF);
 	addMenu(cardata,FLASHMAX,menu4car_bin,menu4car_bin_len,19);
 	addLogo(cardata,logo,256*16,8);
 	addCTable(cardata,colortablefile);
 	addFont(cardata,fontpath);
-	int c;
+	int c=0;
 	if (c=addData(cardata,cart_size,filemenu)) {
 
 		addPages(cardata);
@@ -1135,7 +1164,8 @@ void usage() {
 	printf("\nOptions:\n");
 	printf("	-p <path> - picdata path (default Menu4Car, built in), raw 8-bit b&w 512 byte length\n");
 	printf("	-t <path> - color table path (default rainbow, built in), 16 byte length of atari colors\n");
-	printf("	-o <path> - outputcar path (filetype: <>.car, <>.bin or <>.exe or <>.xex; no ext to save all .car, .bin and .xex.\n");
+	printf("	-o <path> - output car path (filetype: .car, .bin, .exe or .xex); no ext to save all .car, .bin and .xex.\n");
+	printf("	-b <path> - input binary car image path (type .car or .bin) to make the cart flasher of\n");
 	printf("	-c <compression> - forced compression method 0/1/2/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
 	printf("	-f <path> - path to 1024 byte length font file\n");
 	printf("	-s <size> - logical cart size: 32/64/128/256/512/1024, default 1024\n");
@@ -1160,6 +1190,7 @@ int main( int argc, char* argv[] )
 	char * logofilepath=NULL;
 	char * colortablefile=NULL;
 	char * outfile=NULL;
+	char * carbinfilename=NULL;
 	char * fontpath=NULL;
 	int  cart_size=1024*1024;
 	int  cart_size_physical=1024*1024;
@@ -1190,6 +1221,13 @@ int main( int argc, char* argv[] )
 					case 'o':
 						if (has_val) {
 							outfile=argv[++i];
+						}
+						else
+							usage();
+						break;
+					case 'b':
+						if (has_val) {
+							carbinfilename=argv[++i];
 						}
 						else
 							usage();
@@ -1283,9 +1321,17 @@ int main( int argc, char* argv[] )
 		outfile=outfilearr;
 	}
 
+	if (txtfilename && carbinfilename) {
+		fprintf(stderr,"Selected two input files; please select one: menu.txt or -b cartfile.car\n\n");
+		usage();
+	}
 	int res=0;
+
 	if (txtfilename)
 		res=menu4car(txtfilename,logofilepath, colortablefile, fontpath, outfile, cart_size, cart_size_physical, default_do_compress);
+	else if (carbinfilename) {
+		res=carbintoflasherxex(carbinfilename, outfile, cart_size_physical);
+	}
 	if (errorcounter>0)
 		fprintf(stderr,"Warning: %d input file errors encountered.\n",errorcounter);
 
