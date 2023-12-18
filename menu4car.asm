@@ -1012,7 +1012,7 @@ READBLC		jsr GET_FROM_CAR			; Read LSB
 		jsr IncSrc
 		beq ERRORWM
 		lda DST
-		ora DST
+		ora DST+1
 		beq TRANSF
 		lda CNT
 		ora CNT+1
