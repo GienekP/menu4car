@@ -1048,47 +1048,11 @@ ENDBLK		lda INITAD		; End DOS block
 		bne READBLC		; No EOF read next block
 		rts				; All data readed, back to RUNAD procedure
 		
-INITPART	lda BANK
-		sta STORE+10				; Store BANK
-		lda	SRC			; Store LSB
-		sta STORE+11
-		lda SRC+1		; Store MSB
-		sta STORE+12
-		stx STORE+13
-		sty STORE+14
-
-		jsr CopyENT		; Copy ENTRY Procedure
-		lda INITAD
-		sta RUN
-		lda INITAD+1
-		sta RUN+1		; Copy INITAD
-
-		sei
-		lda #$00
-		sta CRITIC
+INITPART	clc
+		jsr preparetoinit
 		jsr ENTRY
-
-		lda #$01
-		sta CRITIC
-		lda #$00
-		sta DMACTL
-		lda TRIG3
-		sta GINTLK
-		cli				; Allow IRQ
-				
-		lda #$FF		; Clear INITAD for next detection
-		sta INITAD
-		sta INITAD+1
-
-		jsr CopyCPY
-		ldy STORE+14
-		ldx STORE+13
-		lda STORE+12
-		sta SRC+1		; Restore MSB
-		lda STORE+11
-		sta SRC			; Restore LSB
-		lda STORE+10
-		sta BANK		; Restore BANK
+		clc
+		jsr restoreinit
 		jsr IncSrc
 		jne READBLC
 		rts
@@ -1162,23 +1126,31 @@ CENDBLK
 
 		jmp CREADBLC		; No EOF read next block
 		
-CINITPART
-		lda	BANK
-		sta	STORE+10				; Store BANK
-		lda	SRC			; Store LSB
-		sta	STORE+11
-		lda	SRC+1		; Store MSB
-		sta	STORE+12
-		lda	CBUFFER
-		sta	STORE+13
-		lda	CBUFSRC
-		sta	STORE+14
-		txa
-		sta	STORE+15
-		tya
-		sta	STORE+16
+CINITPART	sec
+		jsr preparetoinit
+		jsr ENTRY
+		sec
+		jsr restoreinit
+		clc
+		jmp CLOOP
 
-
+preparetoinit
+		; if carry set - 256 bytes decompress init
+		; if carry clr - normal block apl init
+		lda BANK
+		sta STORE+10				; Store BANK
+		lda SRC			; Store LSB
+		sta STORE+11
+		lda SRC+1		; Store MSB
+		sta STORE+12
+		;bcs ?nxt
+			lda CBUFFER	; 256
+			sta STORE+13	; 256
+			lda CBUFSRC	; 256
+			sta STORE+14	; 256
+?nxt
+		stx STORE+15
+		sty STORE+16
 		jsr CopyENT		; Copy ENTRY Procedure
 		lda INITAD
 		sta RUN
@@ -1188,8 +1160,10 @@ CINITPART
 		sei
 		lda #$00
 		sta CRITIC
-		jsr ENTRY
+		rts
 
+
+restoreinit
 		lda #$01
 		sta CRITIC
 		lda #$00
@@ -1202,24 +1176,27 @@ CINITPART
 		sta INITAD
 		sta INITAD+1
 
+		scc
 		jsr CopyCPY256
-		lda STORE+16
-		tay
-		lda STORE+15
-		tax
-		lda STORE+14
-		sta	CBUFSRC
-		lda STORE+13
-		sta	CBUFFER
+
+		scs
+		jsr CopyCPY
+
+		ldy STORE+16
+		ldx STORE+15
+		;bcs ?nxt
+			lda STORE+14	; 256
+			sta CBUFSRC	; 256
+			lda STORE+13	; 256
+			sta CBUFFER	; 256
+?nxt
 		lda STORE+12
-		sta	SRC+1		; Restore MSB
+		sta SRC+1		; Restore MSB
 		lda STORE+11
-		sta	SRC			; Restore LSB
+		sta SRC			; Restore LSB
 		lda STORE+10
-		sta	BANK		; Restore BANK
-		clc
-		jmp CLOOP
-		
+		sta BANK		; Restore BANK
+		rts
 ;-----------------------------------------------------------------------		
 ; Set Source by POSx4 value
 SETPOSSRC
