@@ -4,6 +4,7 @@
 ; (c) 2023 GienekP, jhusak
 ;
 ;-----------------------------------------------------------------------
+	opt ?+	; use local ?variables
 ; how many bytes for variables
 STORAGE = $4A
 ; how many bytes for code
@@ -46,15 +47,15 @@ offsetH = (VARIABLES+9)
 EBPL    = (VARIABLES+$a)
 EBPH    = (VARIABLES+$b)
 bl      = (VARIABLES+$c)
-PAGE      = (VARIABLES+$d)
-STORE      = (VARIABLES+$e)
+PAGE    = (VARIABLES+$d)
+STORE   = (VARIABLES+$e)
 ; place for storing variables before call, 17 bytes
 KRPDEL	= STORE+17
 oldconsol	= STORE+18
 oldjoy	= STORE+19
 TMP	= STORE+20
 ramcold	= STORE + 22
-dliram = STORE + 28 ; 32 bytes long
+dliram = ramcold + 6 ; 32 bytes long
 
 ENTRY   = (BASEE)
 RUN     = (BASEE+ADRRUN+1-ENTRYS)
@@ -271,7 +272,7 @@ DISCARTE
 ; END OF CONTINUOUS MEM TO BE STORED IN RAM
 		.print "RAMDATALEN: ",*-STARTRAMDATA
 ;-----------------------------------------------------------------------		
-; Copy Clear to $0400
+; Copy Clear to BASEE
 CopyCLR		ldx #(CLPRE-CLPRS-1)
 		ldy #(CLPRE-STARTRAMDATA)
 		jsr CopyUniY
@@ -983,14 +984,14 @@ READRAWXEX
 ; --------------------------------------------------
 ; uncompressed/raw read binary part
 ; --------------------------------------------------
-ERRORWM	jmp RESETCD 	; Warm Reset if ERROR
+ERRORWM		jmp RESETCD 	; Warm Reset if ERROR
 @		jsr IncSrc
 		beq ERRORWM
 		jsr GET_FROM_CAR
 		cmp #$FF
 		beq LOOP
 		bne ERRORWM
-LOOP	jsr IncSrc
+LOOP		jsr IncSrc
 		beq ERRORWM
 		
 READBLC		jsr GET_FROM_CAR			; Read LSB
@@ -1011,9 +1012,9 @@ READBLC		jsr GET_FROM_CAR			; Read LSB
 		sta CNT+1		; Set Last Write MSB
 		jsr IncSrc
 		beq ERRORWM
-		lda DST
-		ora DST+1
-		beq TRANSF
+		lda DST			; this handles
+		ora DST+1		; reading run
+		beq TRANSF		; of zeros at the end mostly
 		lda CNT
 		ora CNT+1
 		bne TRANSF
@@ -1143,12 +1144,12 @@ preparetoinit
 		sta STORE+11
 		lda SRC+1		; Store MSB
 		sta STORE+12
-		;bcs ?nxt
+		bcc @+
 			lda CBUFFER	; 256
 			sta STORE+13	; 256
 			lda CBUFSRC	; 256
 			sta STORE+14	; 256
-?nxt
+@
 		stx STORE+15
 		sty STORE+16
 		jsr CopyENT		; Copy ENTRY Procedure
@@ -1184,12 +1185,12 @@ restoreinit
 
 		ldy STORE+16
 		ldx STORE+15
-		;bcs ?nxt
+		bcc @+
 			lda STORE+14	; 256
 			sta CBUFSRC	; 256
 			lda STORE+13	; 256
 			sta CBUFFER	; 256
-?nxt
+@
 		lda STORE+12
 		sta SRC+1		; Restore MSB
 		lda STORE+11
