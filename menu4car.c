@@ -504,7 +504,7 @@ unsigned int compressBlockByBlock(int comprmethod, U8 *bufin, unsigned int retsi
 									);
 							for (int c=0; c<csize; c++) bufout[o+c]=output_data[c];
 							free(output_data);
-							printf("Compress: %d to %d, offset %04x\n",tsize,csize,o);
+							//printf("Compress: %d to %d, offset %04x\n",tsize,csize,o);
 						}
 						break;
 				}
@@ -1207,7 +1207,7 @@ void usage() {
 	printf("	-t <path> - color table path (default rainbow, built in), 16 byte length of atari colors\n");
 	printf("	-o <path> - output car path (filetype: .car, .bin, .exe or .xex); no ext to save all .car, .bin and .xex.\n");
 	printf("	-b <path> - input binary car image path (type .car or .bin) to make the cart flasher of\n");
-	printf("	-c <compression> - forced compression method 0/1/2/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
+	printf("	-c <compression> - forced compression method 0/1/2/3/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
 	printf("	-f <path> - path to 1024 byte length font file\n");
 	printf("	-s <size> - logical cart size: 32/64/128/256/512/1024, default 1024\n");
 	printf("	-S <size> - physical cart size: 32/64/128/256/512/1024, default as logical; if set must be after -s\n");
@@ -1285,6 +1285,7 @@ int main( int argc, char* argv[] )
 									case '0':
 									case '1':
 									case '2':
+									case '3':
 										default_do_compress=argv[i][0]-'0';
 										break;
 									default:

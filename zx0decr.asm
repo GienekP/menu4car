@@ -107,8 +107,10 @@ copy_byte     sec ;1
 		inc SRC+1
 		bit SRC+1
 		bvc @+
+		pha
 		lda #$A0
 		sta SRC+1
+		pla
 		inc BANK
 @
 	      plp
