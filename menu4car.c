@@ -377,7 +377,7 @@ unsigned int loadFile(const char *path, U8 *buf, unsigned int sizebuf)
 void saveFile(const char * tname, U8 *raw, unsigned int size)
 {
 	static int licz=0;
-	char * name[1000];
+	char name[1000];
 	FILE *pf;
 	if (tname==NULL)
 		sprintf(name,"RAW%d.XEX",licz++);
@@ -464,7 +464,8 @@ unsigned int compressBlockByBlock(int comprmethod, U8 *bufin, unsigned int retsi
 		{
 			start = GETW(bufin,i);
 			stop  = GETW(bufin,i+2);
-			printf("Block: %04x-%04x, len %04x\n",start,stop, stop-start+1);
+			if (be_verbose>=3)
+				printf("Block: %04x-%04x, len %04x\n",start,stop, stop-start+1);
 
 			int initrun=(start<=0x2e2) && (stop>=0x2e2);
 			PUTW(bufout,o,start);
@@ -495,7 +496,7 @@ unsigned int compressBlockByBlock(int comprmethod, U8 *bufin, unsigned int retsi
 							int delta;
 							int quick_mode=1;
 
-							char * output_data = compress(
+							unsigned char * output_data = compress(
 									optimize(&bufin[i], tsize, 0, quick_mode ? MAX_OFFSET_ZX7 : MAX_OFFSET_ZX0),
 									&bufin[i], tsize,
 									0, 0, 1,
@@ -1171,7 +1172,7 @@ int menu4car(const char * filemenu, const char * logo, const char * colortablefi
 	addCTable(cardata,colortablefile);
 	addFont(cardata,fontpath);
 	int c=0;
-	if (c=addData(cardata,cart_size,filemenu)) {
+	if ((c=addData(cardata,cart_size,filemenu))) {
 
 		addPages(cardata);
 
@@ -1390,8 +1391,8 @@ int main( int argc, char* argv[] )
 			fprintf(stderr,"Warning: %d input file errors encountered.\n",errorcounter);
 
 	} else {
-		static char input_data[FLASHMAX];
-		static char output_data[FLASHMAX];
+		static U8 input_data[FLASHMAX];
+		static U8 output_data[FLASHMAX];
 		int delta;
 		//strcat(outfilearr,".bzx0");
 		strcat(outfilearr,".bapl");
@@ -1409,7 +1410,7 @@ int main( int argc, char* argv[] )
 			//output_data = compress(optimize(input_data, input_size, 0, quick_mode ? MAX_OFFSET_ZX7 : MAX_OFFSET_ZX0), input_data, input_size, 0, 0, 1, &output_size, &delta);
 
 		}
-		saveFile(outfilearr,output_data,output_size);
+		saveFile((char *)outfilearr,output_data,output_size);
 		if (be_verbose) printf("Saved %d bytes to file '%s'\n",output_size,outfilearr);
 	}
 
