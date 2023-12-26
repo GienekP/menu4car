@@ -1,6 +1,6 @@
 CC = gcc
 MAIN = menu4car
-LFLAGS=apultra/libapultra$(SUF).a -Lapultra -lapultra$(SUF) $(ARCH)
+LFLAGS=apultra/libapultra$(SUF).a optimize$(SUF).o compress$(SUF).o memory$(SUF).o -Lapultra -lapultra$(SUF) $(ARCH)
 CFLAGS=-c -O3 -g -fomit-frame-pointer -Iapultra/src/libdivsufsort/include -Iapultra/src $(ARCH)
 SYSTEM = $(shell uname -s -m)
 
@@ -17,13 +17,22 @@ $(MAIN).arm64: $(MAIN).c $(MAIN).h
 
 else
 
-$(MAIN)$(SUF): $(MAIN)$(SUF).o libapultra$(SUF).a
+$(MAIN)$(SUF): $(MAIN)$(SUF).o compress$(SUF).o optimize$(SUF).o memory$(SUF).o libapultra$(SUF).a
 	@echo "DOING " $@
 	$(CC) "$<" $(LFLAGS) -o $@
 
 endif
 
-$(MAIN)$(SUF).o: $(MAIN).c $(MAIN).h
+memory$(SUF).o: ZX0/src/memory.c
+	$(CC) "$<" $(CFLAGS) -o $@
+	
+compress$(SUF).o: ZX0/src/compress.c
+	$(CC) "$<" $(CFLAGS) -o $@
+	
+optimize$(SUF).o: ZX0/src/optimize.c
+	$(CC) "$<" $(CFLAGS) -o $@
+	
+$(MAIN)$(SUF).o: $(MAIN).c $(MAIN).h $(MAIN).bin
 	@echo "DOING " $@
 	$(CC) "$<" $(CFLAGS) -o $@
 

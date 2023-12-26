@@ -4,7 +4,7 @@
 ; (c) 2023 GienekP, jhusak
 ;
 ;-----------------------------------------------------------------------
-	opt ?+	; use local ?variables
+	;opt ?+	; use local ?variables 
 ; how many bytes for variables
 STORAGE = $4A
 ; how many bytes for code
@@ -45,10 +45,13 @@ token	= (VARIABLES+7)
 offsetL = (VARIABLES+8)
 offsetH = (VARIABLES+9)
 EBPL    = (VARIABLES+$a)
+lenL	= EBPL
 EBPH    = (VARIABLES+$b)
+lenH	= EBPH
 bl      = (VARIABLES+$c)
 PAGE    = (VARIABLES+$d)
-STORE   = (VARIABLES+$e)
+TPOS	= (VARIABLES+$e)
+STORE   = (VARIABLES+$f)
 ; place for storing variables before call, 17 bytes
 KRPDEL	= STORE+17
 oldconsol	= STORE+18
@@ -308,6 +311,10 @@ CopyUniY
 		rts
 		
 ;-----------------------------------------------------------------------		
+; CTABLE
+		.print "#define	COLORTABLE_OFFSET	0x",*-$a000
+ctable		dta $06,$16,$26,$36,$46,$56,$66,$76,$86,$96,$a6,$b6,$c6,$d6,$e6,$f6
+;-----------------------------------------------------------------------		
 ; FONTS
 		ORG $B000
 		
@@ -412,10 +419,6 @@ pic		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $
 		dta $07, $e0, $7e, $7e, $3f, $fc, $70, $00, $00, $00, $00, $00, $00, $00, $00, $00
 		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-;-----------------------------------------------------------------------		
-; CTABLE
-		.print "#define	COLORTABLE_OFFSET	0x",*-$a000
-ctable		dta $06,$16,$26,$36,$46,$56,$66,$76,$86,$96,$a6,$b6,$c6,$d6,$e6,$f6
 ;-----------------------------------------------------------------------		
 ; Keyboard Table
 ;		      A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
@@ -966,15 +969,14 @@ LOADXEX		ldx	POS
 		lda	tabtyp,X
 		and	#$70
 		beq	READRAWXEX
-		cmp	#$20
-		beq	READRAWXEX
 		cmp	#$10
 		jeq	READAPL256XEX
-		jmp	RESETCD
+		;jmp	RESETCD
 ; --------------------------------------------------
 ; read binary here
 ; --------------------------------------------------
 READRAWXEX
+		sta TPOS
 		jsr CopyCPY
 		jsr SETPOSSRC
 
@@ -1018,10 +1020,18 @@ READBLC		jsr GET_FROM_CAR			; Read LSB
 		lda CNT
 		ora CNT+1
 		bne TRANSF
-DECRTRANSF
+DECRTRANSF	ldx TPOS
+		cpx	#$20
+		beq	aplgo
+zx0go
+		jsr dzx0_standard_decomp_blk
+		clc
+		bcc compgo
+aplgo
 		; decomp stuff
 		jsr aPL_depack_blk
 		; compressed blocks never contain init/run addresses
+compgo
 		jsr CheckSrc
 		bne READBLC
 		rts
@@ -1266,6 +1276,7 @@ CmpDst		lda DST
 ;-----------------------------------------------------------------------		
 ;-----------------------------------------------------------------------
 		icl "apldecr.asm"
+		icl "zx0decr.asm"
 		
 	.print"End of code: ",*
 ;-----------------------------------------------------------------------		

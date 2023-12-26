@@ -20,6 +20,12 @@
 #include <errno.h>
 
 #include "libapultra.h"
+#include "ZX0/src/zx0.h"
+#define MAX_OFFSET_ZX0    32640
+#define MAX_OFFSET_ZX7     2176
+
+#define COMPRESS_APL	1
+#define COMPRESS_ZX0	2
 /*--------------------------------------------------------------------*/
 typedef unsigned char U8;
 /*--------------------------------------------------------------------*/
@@ -61,6 +67,7 @@ int skipcounter=0;
 int do_bin_output=0;
 int default_do_compress=-1;
 int cartsizetab[]={32,64,128,256,512,1024};
+int xex_compress=0;
 /*--------------------------------------------------------------------*/
 U8 ATASCII2Internal(U8 a)
 {
@@ -172,7 +179,7 @@ void fillATASCII(U8 *txt, const U8 *name, unsigned int limit)
 #define GETCMPR(_data,_pos)	(_data[DAOFFS(_pos,0)]&0x70)
 #define GETTYPE(_data,_pos)	(_data[DAOFFS(_pos,0)]&0x7)
 #define IS_LAST(_data,_pos)	(_data[DAOFFS(_pos,0)]&0x80)
-#define SETDATA(_data,_pos,_flags,_bank,_adr,_tpos) {\
+#define SETMETADATA(_data,_pos,_flags,_bank,_adr,_tpos) {\
 	data[DAOFFS(_pos,0)]=_flags;\
 	data[DAOFFS(_pos,1)]=_bank;\
 	data[DAOFFS(_pos,2)]=((_adr)&0xFF);\
@@ -269,7 +276,7 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 
 	if (pos==0) 
 	{	// init first entry as end marker
-		SETDATA(data,pos,0x80,1,0x0000,0);
+		SETMETADATA(data,pos,0x80,1,0x0000,0);
 	}
 		
 	start=GETADDR(data,pos);
@@ -300,9 +307,9 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 
 			if (0==getRoomFor8kBCart(data,carsize,lcartstart,lcartbank,buf))
 			{
-				SETDATA(data,lcartbank,flags&0x7f,lcartbank+1,lcartstart,pos);
+				SETMETADATA(data,lcartbank,flags&0x7f,lcartbank+1,lcartstart,pos);
 				//move last entry one pos up
-				SETDATA(data,pos+1,0x80,((stop/BANKSIZE)&0x7F),stop,0);
+				SETMETADATA(data,pos+1,0x80,((stop/BANKSIZE)&0x7F),stop,0);
 			}
 			else {
 				//printf("Cart image '%s' not added due to insufficient room.\n",name);
@@ -317,10 +324,10 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 			data[DAOFFS(pos,0)]=flags;
 			data[DAOFFS(pos,4)]=pos;
 
-			// fill with data
+			// append with data
 			for (i=0; i<size; i++) {data[start+i]=buf[i];};
 			// mark as last in advance.
-			SETDATA(data,pos+1,0x80,((stop/BANKSIZE)&0x7F),stop,0);
+			SETMETADATA(data,pos+1,0x80,((stop/BANKSIZE)&0x7F),stop,0);
 		}
 
 		data[SC_POS_OFFSET+3]='A'+(pos%26)-0x20;
@@ -445,7 +452,7 @@ int repairFile(U8 *buf, int size)
 	return ret;
 }
 /*--------------------------------------------------------------------*/
-unsigned int compressAPLBlockByBlock(U8 *bufin, unsigned int retsize, U8 * bufout)
+unsigned int compressBlockByBlock(int comprmethod, U8 *bufin, unsigned int retsize, U8 * bufout)
 {
 	unsigned int i=2, o=2, j;
 	if (GETW(bufin,0)==0xFFFF)
@@ -457,6 +464,7 @@ unsigned int compressAPLBlockByBlock(U8 *bufin, unsigned int retsize, U8 * bufou
 		{
 			start = GETW(bufin,i);
 			stop  = GETW(bufin,i+2);
+			printf("Block: %04x-%04x, len %04x\n",start,stop, stop-start+1);
 
 			int initrun=(start<=0x2e2) && (stop>=0x2e2);
 			PUTW(bufout,o,start);
@@ -470,17 +478,35 @@ unsigned int compressAPLBlockByBlock(U8 *bufin, unsigned int retsize, U8 * bufou
 #define COMPRESSION_THRESHOLD	32
 			if (tsize>=COMPRESSION_THRESHOLD) {
 				for (j=o; j<MIN(o+tsize,FLASHMAX); j++) {bufout[j]=0;};
+				switch(comprmethod) {
+					case COMPRESS_APL:
+						csize= apultra_compress(&bufin[i],
+								&bufout[o],
+								tsize,
+								FLASHMAX,
+								0,
+								255,
+								0, 
+								NULL,
+								NULL);
+						break;
+					case COMPRESS_ZX0:
+						{
+							int delta;
+							int quick_mode=1;
 
-				csize= apultra_compress(&bufin[i],
-						&bufout[o],
-						tsize,
-						FLASHMAX,
-						0,
-						255,
-						0, 
-						NULL,
-						NULL);
-				//saveFile(&bufout[o],csize);
+							char * output_data = compress(
+									optimize(&bufin[i], tsize, 0, quick_mode ? MAX_OFFSET_ZX7 : MAX_OFFSET_ZX0),
+									&bufin[i], tsize,
+									0, 0, 1,
+									&csize, &delta
+									);
+							for (int c=0; c<csize; c++) bufout[o+c]=output_data[c];
+							free(output_data);
+							printf("Compress: %d to %d, offset %04x\n",tsize,csize,o);
+						}
+						break;
+				}
 			}
 			if (tsize>=COMPRESSION_THRESHOLD && csize<tsize && !initrun) {
 				PUTW(bufout,o-2,0);
@@ -546,6 +572,7 @@ void process_inline_params(const char * addparams) {
 				case '0':
 				case '1':
 				case '2':
+				case '3':
 					do_compress=addparams[i]-'0';
 					break;
 				case 0:
@@ -560,7 +587,7 @@ void process_inline_params(const char * addparams) {
 	} 
 }
 
-unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char *path, const char *addparams,  U8 status)
+unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char *path, const char *addparams)
 {
 	static unsigned int pos=0;
 
@@ -599,94 +626,111 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 	process_inline_params(addparams);
 	process_input_types(path,&flags);
 
-	if (status)
-	{
-		unsigned int size=loadFile(path,bufplain,sizeof(bufplain)-BANKSIZE-6);
-		if (size<=0) return pos;
+	// simplest way that compiles everywhere
+	FILE * fd=fopen(path,"rb");
+	fseek(fd, 0L, SEEK_END);
+	int length = ftell(fd);
+	fclose(fd);
 
+	unsigned int size=loadFile(path,bufplain,MIN(sizeof(bufplain)-BANKSIZE-6,length));
+	if (size<length) return pos;
+
+	if (be_verbose)
+		printf("%s length: %d ",path,size);
+	int filetype=checkTypeByPath(path);
+	if (filetype==TYPE_XEX) {
 		if (be_verbose)
-			printf("%s length: %d ",path,size);
-		int filetype=checkTypeByPath(path);
-		if (filetype==TYPE_XEX) {
-			if (be_verbose)
-				printf("type XEX... ");
-			size=repairFile(bufplain,size);
-			// compress file, get new size.
-			if (size) {
-				int comprsize=0;
-				int choosen_compress_method=0;
-				if (do_compress==-1 || do_compress==1) {
-					/**
-					 * Compress memory
-					 *
-					 * @param pInputData pointer to input(source) data to compress
-					 * @param pOutBuffer buffer for compressed data
-					 * @param nInputSize input(source) size in bytes
-					 * @param nMaxOutBufferSize maximum capacity of compression buffer
-					 * @param nFlags compression flags (set to 0)
-					 * @param nMaxWindowSize maximum window size to use (0 for default)
-					 * @param nDictionarySize size of dictionary in front of input data (0 for none)
-					 * @param progress progress function, called after compressing each block, or NULL for none
-					 * @param pStats pointer to compression stats that are filled if this function is successful, or NULL
-					 *
-					 * @return actual compressed size, or -1 for error
-					 */
-					comprsize= apultra_compress(bufplain,
-							bufcompr,
-							size,
-							sizeof(bufcompr),
-							0,
-							250,//256 - cycle buffer size as well as compression window, one byte less works
-							0, 
-							NULL,
-							NULL);
-					choosen_compress_method=0x10;
+			printf("type XEX... ");
+		size=repairFile(bufplain,size);
+		// compress file, get new size.
+		if (size) {
+			int comprsize=0;
+			int choosen_compress_method=0;
+			if (do_compress==-1 || do_compress==1) {
+				/**
+				 * Compress memory
+				 *
+				 * @param pInputData pointer to input(source) data to compress
+				 * @param pOutBuffer buffer for compressed data
+				 * @param nInputSize input(source) size in bytes
+				 * @param nMaxOutBufferSize maximum capacity of compression buffer
+				 * @param nFlags compression flags (set to 0)
+				 * @param nMaxWindowSize maximum window size to use (0 for default)
+				 * @param nDictionarySize size of dictionary in front of input data (0 for none)
+				 * @param progress progress function, called after compressing each block, or NULL for none
+				 * @param pStats pointer to compression stats that are filled if this function is successful, or NULL
+				 *
+				 * @return actual compressed size, or -1 for error
+				 */
+				comprsize= apultra_compress(bufplain,
+						bufcompr,
+						size,
+						sizeof(bufcompr),
+						0,
+						250,//256 - cycle buffer size as well as compression window, one byte less works
+						0, 
+						NULL,
+						NULL);
+				choosen_compress_method=0x10;
+			}
+			if (do_compress==-1 || do_compress==2) {
+
+				int comprsize2=compressBlockByBlock(COMPRESS_APL,bufplain,size,bufcompr2);
+
+				if (comprsize2<comprsize || do_compress>0)
+				{
+					int j;
+					for (j=0; j<comprsize2; j++) {bufcompr[j]=bufcompr2[j];};
+					comprsize=comprsize2;
+					choosen_compress_method=0x20;
+
 				}
-				if (do_compress==-1 || do_compress==2) {
+			}
+			if (do_compress==-1 || do_compress==3) {
 
-					int comprsize2=compressAPLBlockByBlock(bufplain,size,bufcompr2);
+				int comprsize2=compressBlockByBlock(COMPRESS_ZX0,bufplain,size,bufcompr2);
 
-					if (comprsize2<comprsize || do_compress>0)
-					{
-						int j;
-						for (j=0; j<comprsize2; j++) {bufcompr[j]=bufcompr2[j];};
-						comprsize=comprsize2;
-						choosen_compress_method=0x20;
+				if (comprsize2<comprsize || do_compress>0)
+				{
+					int j;
+					for (j=0; j<comprsize2; j++) {bufcompr[j]=bufcompr2[j];};
+					comprsize=comprsize2;
+					choosen_compress_method=0x30;
 
-					}
 				}
+			}
 
-				#ifdef SAVERAW
-				//saveFile(bufplain,size);
-				if (!do_compress)
-					saveFile(name,bufplain,size);
-				else
-					saveFile(name,bufcompr,comprsize);
+#ifdef SAVERAW
+			//saveFile(bufplain,size);
+			if (!do_compress)
+				saveFile(name,bufplain,size);
+			else
+				saveFile(name,bufcompr,comprsize);
 #endif
-				int over=0;
-				int incrsize=0;
-				if (do_compress && ((comprsize < size) || do_compress>=1)) // forced 
-				{
-					flags|=choosen_compress_method;
-					over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags,choosen_compress_method>>4);
-					incrsize=comprsize;
-				}
-				else if ((comprsize >= size)||!do_compress)
-				{
-					over=insertPos(name,data,carsize,pos,bufplain,size,flags,choosen_compress_method>>4);
-					incrsize=size;
-				}
+			int over=0;
+			int incrsize=0;
+			if (do_compress && ((comprsize < size) || do_compress>=1)) // forced 
+			{
+				flags|=choosen_compress_method;
+				over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags,choosen_compress_method>>4);
+				incrsize=comprsize;
+			}
+			else if ((comprsize >= size)||!do_compress)
+			{
+				over=insertPos(name,data,carsize,pos,bufplain,size,flags,choosen_compress_method>>4);
+				incrsize=size;
+			}
 
-				if (over) {
-					if (be_verbose) {
-						printf("SKIPPED");
-						if (be_verbose>=2)
-							printf(", \"%s\", does not fit, need %i bytes.",name,over);
-						printf("\n");
-					}
+			if (over) {
+				if (be_verbose) {
+					printf("SKIPPED");
+					if (be_verbose>=2)
+						printf(", \"%s\", does not fit, need %i bytes.",name,over);
+					printf("\n");
 				}
-				else {
-					if (0)
+			}
+			else {
+				if (0)
 					if (be_verbose) {
 						printf("SUCCESS!");
 						if (be_verbose>=2) {
@@ -701,57 +745,52 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 						}
 						printf("\n");
 					}
-					osize+=incrsize;
-					ncsize+=size;
-					advance=1;
-				}
-			}
-			else {
-				fprintf(stderr,"Error in xex file '%s'\n",path);
-				printf("\n");
-				errorcounter++;
+				osize+=incrsize;
+				ncsize+=size;
+				advance=1;
 			}
 		}
-		else if (filetype==TYPE_CAR)
-		{
-			if (be_verbose)
-				printf("type CAR... ");
-			switch (size){
-				case 0x410:
-						for (int i=0x10; i<0x410; i++) {bufplain[0x400+i]=bufplain[i];};
-						size+=0x400;
-						// no break;
-				case (0x810):
-						for (int i=0x10; i<0x810; i++) {bufplain[0x800+i]=bufplain[i];};
-						size+=0x800;
-						// no break;
-				case (0x1010):
-						for (int i=0x10; i<0x1010; i++) {bufplain[0x1000+i]=bufplain[i];};
-						size+=0x1000;
-						// no break;
-				case (0x2010):
-						{
-							unsigned int over=insertPos(name,data,carsize,pos,&bufplain[16],0x2000,flags,0);
-							if (over){
-								if (be_verbose)
-									printf("SKIPPED: \"%s\", does not fit, need %i bytes.\n",name,over);
-							} else {
-								osize+=size&0xf800;
-								ncsize+=size&0xf800;
-								advance=1;
-							}
-						}
-						break;
-				default:
-						printf("ERROR: \"%s\", only <=8k cartridges are handled (size: %04x)\n",name,size);
-						errorcounter++;
-			}
+		else {
+			fprintf(stderr,"Error in xex file '%s'\n",path);
+			printf("\n");
+			errorcounter++;
 		}
 	}
-	else
+	else if (filetype==TYPE_CAR)
 	{
-		//clearPos(data,pos);
-	};
+		if (be_verbose)
+			printf("type CAR... ");
+		switch (size){
+			case 0x410:
+				for (int i=0x10; i<0x410; i++) {bufplain[0x400+i]=bufplain[i];};
+				size+=0x400;
+				// no break;
+			case (0x810):
+				for (int i=0x10; i<0x810; i++) {bufplain[0x800+i]=bufplain[i];};
+				size+=0x800;
+				// no break;
+			case (0x1010):
+				for (int i=0x10; i<0x1010; i++) {bufplain[0x1000+i]=bufplain[i];};
+				size+=0x1000;
+				// no break;
+			case (0x2010):
+				{
+					unsigned int over=insertPos(name,data,carsize,pos,&bufplain[16],0x2000,flags,0);
+					if (over){
+						if (be_verbose)
+							printf("SKIPPED: \"%s\", does not fit, need %i bytes.\n",name,over);
+					} else {
+						osize+=size&0xf800;
+						ncsize+=size&0xf800;
+						advance=1;
+					}
+				}
+				break;
+			default:
+				printf("ERROR: \"%s\", only <=8k cartridges are handled (size: %04x)\n",name,size);
+				errorcounter++;
+		}
+	}
 	pos+=advance;
 	return pos;
 }
@@ -846,7 +885,8 @@ int addData(U8 *data, unsigned int carsize, const char *filemenu)
 					printf("Line read num: %d, '%s','%s','%s'\n",i,name,path,addparams);
 				if (name[0]=='#')
 					continue;
-				i=addPos(data,carsize,name,path,addparams,status);
+				if (status) 
+					i=addPos(data,carsize,name,path,addparams);
 				//outTable(data);
 			}
 			else
@@ -860,7 +900,7 @@ int addData(U8 *data, unsigned int carsize, const char *filemenu)
 			if (i>0) o++; // begin counting after some files added
 		};
 		// output summary info
-		addPos(0,carsize,0,0,0,0);
+		addPos(0,carsize,0,0,0);
 		int j;
 		for (j=0; j<MAX_ENTRIES+1; j++)
 		{
@@ -1170,6 +1210,7 @@ void usage() {
 	printf("	-f <path> - path to 1024 byte length font file\n");
 	printf("	-s <size> - logical cart size: 32/64/128/256/512/1024, default 1024\n");
 	printf("	-S <size> - physical cart size: 32/64/128/256/512/1024, default as logical; if set must be after -s\n");
+	printf("	-X <path> - offline block compress *.xex file to *.bzx0 for latter use (ignores all other switches)\n");
 	printf("	-v - be verbose\n");
 	printf("	-? - this help\n\n");
 #ifndef __MINGW__
@@ -1288,7 +1329,15 @@ int main( int argc, char* argv[] )
 						else
 							usage();
 						break;
+					case 'X':
+						if (has_val) {
+							txtfilename=argv[++i];
+							xex_compress=1;
+						}
+						else
+							usage();
 
+						break;
 					case 'v': 
 						be_verbose=strrchr(argv[i],'v')-argv[i];
 						printf("verbose=%d\n",be_verbose);
@@ -1302,12 +1351,16 @@ int main( int argc, char* argv[] )
 				usage();
 
 		}
-		else
-			txtfilename=argv[i];
+		else {
+			if (!xex_compress)
+				txtfilename=argv[i];
+			else
+				usage();
+		}
 		i++;
 	}
 
-	if (outfile==NULL) {
+	if (txtfilename && (outfile==NULL || xex_compress)) {
 		char * c=strrchr(txtfilename,'.');
 		if (!c) {
 			strncpy(outfilearr,txtfilename,1023-8);
@@ -1327,13 +1380,38 @@ int main( int argc, char* argv[] )
 	}
 	int res=0;
 
-	if (txtfilename)
-		res=menu4car(txtfilename,logofilepath, colortablefile, fontpath, outfile, cart_size, cart_size_physical, default_do_compress);
-	else if (carbinfilename) {
-		res=carbintoflasherxex(carbinfilename, outfile, cart_size_physical);
+	if (!xex_compress) {
+		if (txtfilename)
+			res=menu4car(txtfilename,logofilepath, colortablefile, fontpath, outfile, cart_size, cart_size_physical, default_do_compress);
+		else if (carbinfilename) {
+			res=carbintoflasherxex(carbinfilename, outfile, cart_size_physical);
+		}
+		if (errorcounter>0)
+			fprintf(stderr,"Warning: %d input file errors encountered.\n",errorcounter);
+
+	} else {
+		static char input_data[FLASHMAX];
+		static char output_data[FLASHMAX];
+		int delta;
+		//strcat(outfilearr,".bzx0");
+		strcat(outfilearr,".bapl");
+		unsigned int input_size=loadFile(txtfilename,input_data,sizeof(input_data)-BANKSIZE-6);
+		if (be_verbose) printf("Loaded %d bytes from file '%s'\n",input_size, txtfilename);
+		int output_size=0;
+		int quick_mode=0;
+		if (input_size>0) {
+			//output_size = compressBlockByBlock(COMPRESS_APL,input_data,input_size,output_data);
+
+			input_size=repairFile(input_data,input_size);
+
+			output_size = compressBlockByBlock(COMPRESS_APL,input_data,input_size,output_data);
+
+			//output_data = compress(optimize(input_data, input_size, 0, quick_mode ? MAX_OFFSET_ZX7 : MAX_OFFSET_ZX0), input_data, input_size, 0, 0, 1, &output_size, &delta);
+
+		}
+		saveFile(outfilearr,output_data,output_size);
+		if (be_verbose) printf("Saved %d bytes to file '%s'\n",output_size,outfilearr);
 	}
-	if (errorcounter>0)
-		fprintf(stderr,"Warning: %d input file errors encountered.\n",errorcounter);
 
 	return !res;
 }

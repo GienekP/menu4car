@@ -22,6 +22,7 @@ The third optional field are the options. For now options for dos executables:
 * c0 - no compression
 * c1 - apl 256-byte window compression, full stream in/out.
 * c2 - apl every DOS block (long enough) compression
+* c3 - zx0 every DOS block (long enough) compression
 * ca - auto - gets the shortest compressed version (or uncompressed) from above
 
 Maximum 4 * 26 = 104 files may be added. Sometimes some game may not work with compression (what games? - please report in Issues), please add c0 as the option then for tests (and raise an issue, if the file works on Atari for example from SIO device)
@@ -109,6 +110,6 @@ The main author of main functionality: menu, xex reading - GienekP
 
 The add-ons: cmdline arguments, optimization, compression, cartridge handling, 4-page navigation, xex flasher generation - Jakub Husak
 
-The apultra decompressor by xxl (incompatibility of apultra compressed output with aplib spec fixed by him, also)
+The apultra decompressor by xxl (incompatibility of apultra compressed output with aplib spec fixed by him, also); also zx0 decompressor by him.
 
 The apultra compressor by Emmanuel Marty.
