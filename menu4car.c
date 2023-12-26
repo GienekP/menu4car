@@ -629,6 +629,8 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 
 	// simplest way that compiles everywhere
 	FILE * fd=fopen(path,"rb");
+	if (!fd) return pos;
+
 	fseek(fd, 0L, SEEK_END);
 	int length = ftell(fd);
 	fclose(fd);
