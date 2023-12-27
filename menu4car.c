@@ -43,11 +43,15 @@ typedef unsigned char U8;
 #endif
 
 // those types correspond to .asm file
-#define	TYPE_XEX	0
-#define	TYPE_BOOT	1
-#define	TYPE_ATR	2
-#define TYPE_BAS	3
-#define TYPE_CAR	4
+#define	TYPE_XEX	0b00000000
+#define TYPE_MASK_XEX	0b10000000
+#define TYPE_MASK	0b11100000
+#define	TYPE_BOOT	0b10000000
+#define	TYPE_ATR	0b10100000
+#define TYPE_BAS	0b11000000
+#define TYPE_CAR	0b11100000
+
+
 // this is for another use, for output without car header
 #define TYPE_BIN	20
 #define TYPE_UNKNOWN	-1
@@ -174,17 +178,16 @@ void fillATASCII(U8 *txt, const U8 *name, unsigned int limit)
 }
 /*--------------------------------------------------------------------*/
 #define DAOFFS(i,f) (DATAARRAY_OFFSET+(i)+(f)*MAX_ENTRIES_1)
-#define GETADDR(_data,_pos)	(((_data[DAOFFS(_pos,1)])*BANKSIZE)|(((_data[DAOFFS(_pos,3)]<<8)|_data[DAOFFS(_pos,2)])&0x1FFF))
-#define GETBANK(_data,_pos)	(_data[DAOFFS(_pos,1)])
-#define GETCMPR(_data,_pos)	(_data[DAOFFS(_pos,0)]&0x70)
-#define GETTYPE(_data,_pos)	(_data[DAOFFS(_pos,0)]&0x7)
+#define GETADDR(_data,_pos)	(((_data[DAOFFS(_pos,0)]&0x7f)*BANKSIZE)|(((_data[DAOFFS(_pos,2)]<<8)|_data[DAOFFS(_pos,1)])&0x1FFF))
+#define GETBANK(_data,_pos)	(_data[DAOFFS(_pos,0)]&0x7f)
+#define BANK(_data,_pos)	(_data[DAOFFS(_pos,0)])
+#define GETTYPE(_data,_pos)	(_data[DAOFFS(_pos,2)]&TYPE_MASK)
 #define IS_LAST(_data,_pos)	(_data[DAOFFS(_pos,0)]&0x80)
 #define SETMETADATA(_data,_pos,_flags,_bank,_adr,_tpos) {\
-	data[DAOFFS(_pos,0)]=_flags;\
-	data[DAOFFS(_pos,1)]=_bank;\
-	data[DAOFFS(_pos,2)]=((_adr)&0xFF);\
-	data[DAOFFS(_pos,3)]=(((_adr)>>8)&0x1F);\
-	data[DAOFFS(_pos,4)]=_tpos;\
+	data[DAOFFS(_pos,0)]=_bank;\
+	data[DAOFFS(_pos,1)]=((_adr)&0xFF);\
+	data[DAOFFS(_pos,2)]=(((_adr)>>8)&0x1F)|((_flags)&TYPE_MASK);\
+	data[DAOFFS(_pos,3)]=_tpos;\
 	}
 int findLastCarPos(U8 * data){
 	int lpos=0;
@@ -203,7 +206,7 @@ void outTable(U8 * data) {
 	int i=0;
 	while (i<MAX_ENTRIES) {
 		int start=GETADDR(data,i);
-		printf("Data: pos: %d, flags: %02x, bank: %02x, addr: %06x, pos: %d\n",i,GETTYPE(data,i),GETBANK(data,i),start,data[DAOFFS(i,4)]);
+		printf("Data: pos: %d, flags: %02x, bank: %02x, addr: %06x, pos: %d\n",i,GETTYPE(data,i),GETBANK(data,i),start,data[DAOFFS(i,3)]);
 		if (IS_LAST(data,i)) break; // flags
 		i++;
 	}
@@ -249,7 +252,7 @@ int getRoomFor8kBCart(U8 * data,int carsize, int start,int ipos, const U8 * cbuf
 	// also moving entries and store under current
 	i=MAX_ENTRIES-1;
 	while (i>=ipos) {
-		for (int j=0; j<5; j++)
+		for (int j=0; j<4; j++)
 			data[DAOFFS(i+1,j)]=data[DAOFFS(i,j)];
 		i--;
 	}
@@ -259,7 +262,7 @@ int getRoomFor8kBCart(U8 * data,int carsize, int start,int ipos, const U8 * cbuf
 	while (i<MAX_ENTRIES_1)
 	{
 		if (GETTYPE(data,i)!=TYPE_CAR)
-			GETBANK(data,i)++; // inc bank and mark free 8kB
+			BANK(data,i)++; // inc bank and mark free 8kB
 
 		if (IS_LAST(data,i)) break;
 		i++;
@@ -276,7 +279,7 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 
 	if (pos==0) 
 	{	// init first entry as end marker
-		SETMETADATA(data,pos,0x80,1,0x0000,0);
+		SETMETADATA(data,pos,0,0x81,0x0000,0);
 	}
 		
 	start=GETADDR(data,pos);
@@ -290,7 +293,7 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 		// if is CAR then copy slot to next before setting
 		// on the asm side there will be two POSes, one for START
 		// and second for STOP
-		if ((flags & 7) ==TYPE_CAR) { // move the last to next slot
+		if (flags==TYPE_CAR) { // move the last to next slot
 			// insert car data:
 			// find last cart slot and get the bank, or -1 if not found any
 			int lcartpos=findLastCarPos(data);
@@ -307,9 +310,9 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 
 			if (0==getRoomFor8kBCart(data,carsize,lcartstart,lcartbank,buf))
 			{
-				SETMETADATA(data,lcartbank,flags&0x7f,lcartbank+1,lcartstart,pos);
+				SETMETADATA(data,lcartbank,flags,lcartbank+1,lcartstart,pos);
 				//move last entry one pos up
-				SETMETADATA(data,pos+1,0x80,((stop/BANKSIZE)&0x7F),stop,0);
+				SETMETADATA(data,pos+1,0,((stop/BANKSIZE)&0x7F)|0x80,stop,0);
 			}
 			else {
 				//printf("Cart image '%s' not added due to insufficient room.\n",name);
@@ -318,16 +321,18 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 				stop=start;
 			}
 		}
-		else 
+		else if ((flags & TYPE_MASK_XEX)==TYPE_XEX)
 		{
 			// update "last" flags - stop becomes start
-			data[DAOFFS(pos,0)]=flags;
-			data[DAOFFS(pos,4)]=pos;
+			data[DAOFFS(pos,0)]&=0x7f;
+			data[DAOFFS(pos,2)]&=~TYPE_MASK;
+			data[DAOFFS(pos,2)]|=flags|((compmeth&3)<<5);
+			data[DAOFFS(pos,3)]=pos;
 
 			// append with data
 			for (i=0; i<size; i++) {data[start+i]=buf[i];};
 			// mark as last in advance.
-			SETMETADATA(data,pos+1,0x80,((stop/BANKSIZE)&0x7F),stop,0);
+			SETMETADATA(data,pos+1,0,((stop/BANKSIZE)&0x7F)|0x80,stop,0);
 		}
 
 		data[SC_POS_OFFSET+3]='A'+(pos%26)-0x20;
@@ -627,6 +632,8 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 	process_inline_params(addparams);
 	process_input_types(path,&flags);
 
+	if (flags==TYPE_UNKNOWN || flags==TYPE_BIN) return pos;
+
 	// simplest way that compiles everywhere
 	FILE * fd=fopen(path,"rb");
 	if (!fd) return pos;
@@ -674,7 +681,7 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 						0, 
 						NULL,
 						NULL);
-				choosen_compress_method=0x10;
+				choosen_compress_method=1;
 			}
 			if (do_compress==-1 || do_compress==2) {
 
@@ -685,7 +692,7 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 					int j;
 					for (j=0; j<comprsize2; j++) {bufcompr[j]=bufcompr2[j];};
 					comprsize=comprsize2;
-					choosen_compress_method=0x20;
+					choosen_compress_method=2;
 
 				}
 			}
@@ -698,7 +705,7 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 					int j;
 					for (j=0; j<comprsize2; j++) {bufcompr[j]=bufcompr2[j];};
 					comprsize=comprsize2;
-					choosen_compress_method=0x30;
+					choosen_compress_method=3;
 
 				}
 			}
@@ -714,13 +721,13 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 			int incrsize=0;
 			if (do_compress && ((comprsize < size) || do_compress>=1)) // forced 
 			{
-				flags|=choosen_compress_method;
-				over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags,choosen_compress_method>>4);
+				//flags|=choosen_compress_method<<5;
+				over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags,choosen_compress_method);
 				incrsize=comprsize;
 			}
 			else if ((comprsize >= size)||!do_compress)
 			{
-				over=insertPos(name,data,carsize,pos,bufplain,size,flags,choosen_compress_method>>4);
+				over=insertPos(name,data,carsize,pos,bufplain,size,flags,0);
 				incrsize=size;
 			}
 
@@ -905,12 +912,12 @@ int addData(U8 *data, unsigned int carsize, const char *filemenu)
 		// output summary info
 		addPos(0,carsize,0,0,0);
 		int j;
-		for (j=0; j<MAX_ENTRIES+1; j++)
-		{
-			int DA_POS_OFFSET=DATAARRAY_OFFSET+j;
+		//for (j=0; j<MAX_ENTRIES+1; j++)
+		//{
+		//	int DA_POS_OFFSET=DATAARRAY_OFFSET+j;
 			// update hi byte of every entry
-			if (data[DA_POS_OFFSET]!=0xFF) {data[DA_POS_OFFSET+3*MAX_ENTRIES_1]|=0xA0;};
-		};
+		//	if (data[DA_POS_OFFSET]!=0xFF) {data[DA_POS_OFFSET+3*MAX_ENTRIES_1]|=0xA0;};
+		//};
 		fclose(pf);
 	}
 	else
@@ -1251,100 +1258,77 @@ int main( int argc, char* argv[] )
 				int actualswitch=argv[i][1];
 				switch (actualswitch) {
 					case 'p':
-						if (has_val)
-							logofilepath=argv[++i];
-						else
-							usage();
+						if (!has_val) usage();
+						logofilepath=argv[++i];
 						break;
 					case 't':
-						if (has_val)
-							colortablefile=argv[++i];
-						else
-							usage();
+						if (!has_val) usage();
+						colortablefile=argv[++i];
 						break;
 					case 'o':
-						if (has_val) {
-							outfile=argv[++i];
-						}
-						else
-							usage();
+						if (!has_val) usage();
+						outfile=argv[++i];
 						break;
 					case 'b':
-						if (has_val) {
-							carbinfilename=argv[++i];
-						}
-						else
-							usage();
+						if (!has_val) usage();
+						carbinfilename=argv[++i];
 						break;
 					case 'c':
-						if (has_val) {
-							i++;
-							if (strlen(argv[i])==1) {
-								switch (argv[i][0]) {
-									case 'a':
-										default_do_compress=-1;
-										break;
-									case '0':
-									case '1':
-									case '2':
-									case '3':
-										default_do_compress=argv[i][0]-'0';
-										break;
-									default:
-										usage();
-								}
+						if (!has_val) usage();
+						i++;
+						if (strlen(argv[i])==1) {
+							switch (argv[i][0]) {
+								case 'a':
+									default_do_compress=-1;
+									break;
+								case '0':
+								case '1':
+								case '2':
+								case '3':
+									default_do_compress=argv[i][0]-'0';
+									break;
+								default:
+									usage();
 							}
-						} else usage();
+						}
 
 						break;
 					case 'f':
-						if (has_val)
-							fontpath=argv[++i];
-						else
-							usage();
-
-						//printf("Font path: %s\n",fontpath);
-
+						if (!has_val) usage();
+						fontpath=argv[++i];
 						break;
 					case 'S':
 					case 's':
-						if (has_val) {
-							int s;
-							i++;
-							for (s=0; s<sizeof(cartsizetab)/sizeof(cartsizetab[0]); s++){
-								char test[10];
-								sprintf(test,"%d",cartsizetab[s]);
+						if (!has_val) usage();
+						int s;
+						i++;
+						for (s=0; s<sizeof(cartsizetab)/sizeof(cartsizetab[0]); s++){
+							char test[10];
+							sprintf(test,"%d",cartsizetab[s]);
 
-								if (strcmp(test,argv[i])==0) {
-									int cs=strtol(argv[i],NULL,10)*1024;
+							if (strcmp(test,argv[i])==0) {
+								int cs=strtol(argv[i],NULL,10)*1024;
 
-									if (actualswitch=='S')
-										cart_size_physical=cs;
-									if (actualswitch=='s') {
-										cart_size=cs;
-										cart_size_physical=cs;
-									}
-									//printf("Cart size: %d\n",cart_size);
-									break;
+								if (actualswitch=='S')
+									cart_size_physical=cs;
+								if (actualswitch=='s') {
+									cart_size=cs;
+									cart_size_physical=cs;
 								}
+								//printf("Cart size: %d\n",cart_size);
+								break;
 							}
-							if (s==6) usage();
 						}
-						else
-							usage();
+						if (s==6) usage();
 						break;
 					case 'X':
-						if (has_val) {
-							txtfilename=argv[++i];
-							xex_compress=1;
-						}
-						else
-							usage();
-
+						if (!has_val) usage();
+						txtfilename=argv[++i];
+						xex_compress=1;
 						break;
 					case 'v': 
 						be_verbose=strrchr(argv[i],'v')-argv[i];
-						printf("verbose=%d\n",be_verbose);
+						printf("verbose level: %d\n",be_verbose);
 						
 						break;
 					default:

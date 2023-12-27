@@ -146,8 +146,6 @@ screen_data
 		.print "#define	DATAARRAY_OFFSET	0x",*-$a000
 ;-----------------------------------------------------------------------		
 ; Table of files:
-; table of types
-tabtyp	:+(105) dta 0
 ; bank part of address
 tabbnk	:+(105) dta 0
 ; in-bank adress lo byte 
@@ -311,9 +309,65 @@ CopyUniY
 		rts
 		
 ;-----------------------------------------------------------------------		
-; CTABLE
-		.print "#define	COLORTABLE_OFFSET	0x",*-$a000
-ctable		dta $06,$16,$26,$36,$46,$56,$66,$76,$86,$96,$a6,$b6,$c6,$d6,$e6,$f6
+; Keyboard Table
+;		      A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
+KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,$2F,$28,$3E,$2D,$0B,$10,$2E,$16,$2B,$17
+		; 1 2 3 4
+		dta 31,30,26,24 
+keytbllen	=	*-KEYTBLE
+
+;-----------------------------------------------------------------------		
+reinit_e
+		ldx #(GR0INITE-GR0INITS)
+@		lda GR0INITS-1,X
+		sta BASEE-1,X
+		dex
+		bne @-
+
+		lda #$c0
+		sta RAMTOP
+		sta MEMTOP+1
+		stx MEMTOP
+
+		lda #$0c ; close
+		; ldx #$00 x is 0 already
+		sta ICCMD,X
+		jsr JCIOMAIN
+
+		;ldx #$01
+		;stx CRITIC
+
+		lda #3	; open
+		ldx #$00
+		sta ICCMD,X
+		lda # <NAME
+		sta ICBUFA,X
+		lda # >NAME
+		sta ICBUFA+1,X
+		lda #$0C
+		sta ICAX1,X
+		jsr BASEE
+
+		;lda #0
+		;sta CRITIC
+		rts
+GR0INITS
+		sei
+		sta $D5FF
+		lda TRIG3
+		sta GINTLK
+		cli
+		jsr JCIOMAIN
+		sei
+		sta $D500
+		lda TRIG3
+		sta GINTLK
+		cli
+		rts
+TNAME		dta 'E:',$9b
+GR0INITE
+
+;-----------------------------------------------------------------------		
 ;-----------------------------------------------------------------------		
 ; FONTS
 		ORG $B000
@@ -419,67 +473,12 @@ pic		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $
 		dta $07, $e0, $7e, $7e, $3f, $fc, $70, $00, $00, $00, $00, $00, $00, $00, $00, $00
 		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
 		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+
 ;-----------------------------------------------------------------------		
-; Keyboard Table
-;		      A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
-KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,$2F,$28,$3E,$2D,$0B,$10,$2E,$16,$2B,$17
-		; 1 2 3 4
-		dta 31,30,26,24 
-keytbllen	=	*-KEYTBLE
-
-
+; CTABLE
+		.print "#define	COLORTABLE_OFFSET	0x",*-$a000
+ctable		dta $06,$16,$26,$36,$46,$56,$66,$76,$86,$96,$a6,$b6,$c6,$d6,$e6,$f6
 ;-----------------------------------------------------------------------	
-reinit_e
-		ldx #(GR0INITE-GR0INITS)
-@		lda GR0INITS-1,X
-		sta BASEE-1,X
-		dex
-		bne @-
-
-		lda #$c0
-		sta RAMTOP
-		sta MEMTOP+1
-		stx MEMTOP
-
-		lda #$0c ; close
-		; ldx #$00 x is 0 already
-		sta ICCMD,X
-		jsr JCIOMAIN
-
-		;ldx #$01
-		;stx CRITIC
-
-		lda #3	; open
-		ldx #$00
-		sta ICCMD,X
-		lda # <NAME
-		sta ICBUFA,X
-		lda # >NAME
-		sta ICBUFA+1,X
-		lda #$0C
-		sta ICAX1,X
-		jsr BASEE
-
-		;lda #0
-		;sta CRITIC
-		rts
-GR0INITS
-		sei
-		sta $D5FF
-		lda TRIG3
-		sta GINTLK
-		cli
-		jsr JCIOMAIN
-		sei
-		sta $D500
-		lda TRIG3
-		sta GINTLK
-		cli
-		rts
-TNAME		dta 'E:',$9b
-GR0INITE
-
-;-----------------------------------------------------------------------		
 ;-----------------------------------------------------------------------		
 ; P/M DATA
 ;		.print "#define	PM_DATA_OFFSET	0x",*-$a000
@@ -607,7 +606,7 @@ CONTIN
 		; Chose XEX
 		ldx #$ff
 @		inx
-		lda tabtyp,X
+		lda tabbnk,X
 		bpl @-
 		;--------
 		; RUN if only one pos
@@ -940,18 +939,20 @@ LOADPOS
 		sta INITAD+1
 
 		ldx POS
-		lda tabtyp,X
-		and #7
-		cmp	#0
-		beq	LOADXEX
-		cmp	#1
+		lda tabahi,X
+		and #$e0
+		; must correspond to #define in .c file
+		cmp	#$80
 		beq	LOADBOOT
-		cmp	#2
+		cmp	#$a0
 		beq	LOADATR
-		cmp	#3
+		cmp	#$c0
 		beq	LOADBASIC
-		cmp	#4
+		cmp	#$e0
 		beq	LOADCAR
+		sta	TPOS
+		bne	LOADXEX
+		
 
 LOADBOOT
 LOADATR
@@ -965,18 +966,13 @@ LOADCAR		; 8 kb car area straight mapping
 		lda	tabbnk,X ; bank
 		jmp	RUNCART
 		
-LOADXEX		ldx	POS
-		lda	tabtyp,X
-		and	#$70
-		beq	READRAWXEX
-		cmp	#$10
+LOADXEX		lda	TPOS
+		cmp	#$20
 		jeq	READAPL256XEX
-		;jmp	RESETCD
 ; --------------------------------------------------
 ; read binary here
 ; --------------------------------------------------
 READRAWXEX
-		sta TPOS
 		jsr CopyCPY
 		jsr SETPOSSRC
 
@@ -1021,9 +1017,9 @@ READBLC		jsr GET_FROM_CAR			; Read LSB
 		ora CNT+1
 		bne TRANSF
 DECRTRANSF	ldx TPOS
-		cpx	#$20
+		cpx	#$40 ; eq 2
 		beq	aplgo
-zx0go
+zx0go		; X==#$60 eq 3
 		jsr dzx0_standard_decomp_blk
 		clc
 		bcc compgo
@@ -1215,6 +1211,8 @@ SETPOSSRC
 		lda tabbnk,X	; BANK ->A
 		sta BANK
 		lda tabahi,X	; MSB ->Y
+		and #$1f
+		ora #$a0
 		sta SRC+1
 		lda tabalo,X	; LSB ->X
 		sta SRC
@@ -1244,9 +1242,12 @@ CheckSrc
 		cmp SRC
 		bne @+
 		lda tabahi+1,X
+		and #$1f
+		ora #$a0
 		cmp SRC+1
 		bne @+
 		lda tabbnk+1,X
+		and #$7f
 		cmp BANK
 @		
 		rts
