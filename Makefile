@@ -32,18 +32,25 @@ compress$(SUF).o: ZX0/src/compress.c
 optimize$(SUF).o: ZX0/src/optimize.c
 	$(CC) "$<" $(CFLAGS) -o $@
 	
-$(MAIN)$(SUF).o: $(MAIN).c $(MAIN).h $(MAIN).bin
+$(MAIN)$(SUF).o: $(MAIN).c $(MAIN).h $(MAIN).bin ramdata.h
 	@echo "DOING " $@
 	$(CC) "$<" $(CFLAGS) -o $@
+
+ramdata.h :ramdata.bin
+	xxd -i -c 16 "$<" "$@"
 
 $(MAIN).h : $(MAIN).bin
 	xxd -i -c 16 "$<" "$@"
 
-test : $(MAIN).asm apldecr.asm
+test : $(MAIN).asm apldecr.asm zx0decr.asm
 	mads "$<" -t -o:menu4car.obx | sed "s/\\$$//g"
 
-$(MAIN).bin : $(MAIN).asm apldecr.asm
-	mads "$<" -t -l -o:"$@" | sed "s/\\$$//g" | tee |  grep "#define" >menu4car_interface.h
+ramdata.bin : ramdata.asm
+	mads "$<" -t -o:$@ | sed "s/\\$$//g" | tee |  grep "#define" >menu4car_interface_ram.h
+
+
+$(MAIN).bin : $(MAIN).asm apldecr.asm zx0decr.asm ramdata.bin
+	mads "$<" -t -l -o:"$@" | sed "s/\\$$//g" | tee |  grep "#define" >menu4car_interface_flash.h
 
 libapultra$(SUF).a:
 	$(shell ./apultra_fix_makefile.sh)
@@ -62,9 +69,12 @@ clean:
 	rm -f menu4car.exe
 	rm -f *.o
 	rm -f *.lab
+	rm -f *.lst
 	rm -f menu4car.bin
+	rm -f ramdata.bin
 	rm -f menu4car.arm64
 	rm -f menu4car.x86_64
+	rm -f menu4car_interface_*.h
 	$(MAKE) -f Makefile.menu4car -C apultra clean SUF=.arm64
 	$(MAKE) -f Makefile.menu4car -C apultra clean SUF=.x86_64
 	$(MAKE) -f Makefile -C apultra clean

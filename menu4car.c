@@ -29,13 +29,14 @@
 /*--------------------------------------------------------------------*/
 typedef unsigned char U8;
 /*--------------------------------------------------------------------*/
+#define MENU_SPACE	4096	// space for compressed menu entries
 #define FLASHMAX (2*512*1024)
 #define BANKSIZE (0x2000)
 #define PATHLEN (0x400)
 #define NAMELEN (0x100)
 #define PARAMSLEN (8)
 #define DELIM	('|')
-#define MAX_ENTRIES	104
+#define MAX_ENTRIES	130
 #define MAX_ENTRIES_1	(MAX_ENTRIES+1)
 
 #if ! defined(MIN)
@@ -57,10 +58,12 @@ typedef unsigned char U8;
 #define TYPE_UNKNOWN	-1
 
 // provided from .asm mads compile
-#include "menu4car_interface.h"
+#include "menu4car_interface_ram.h"
+#include "menu4car_interface_flash.h"
 #include "flashgenerator/flashgenerator.h"
 #include "flashgenerator/menu4car_templateflasher.h"
 /*--------------------------------------------------------------------*/
+#include "ramdata.h"
 #include "menu4car.h"
 #include "apultra/src/libapultra.h"
 /*--------------------------------------------------------------------*/
@@ -270,7 +273,7 @@ int getRoomFor8kBCart(U8 * data,int carsize, int start,int ipos, const U8 * cbuf
 	return 0; // ok.
 }
 /*--------------------------------------------------------------------*/
-unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigned int pos,
+unsigned int insertPos(const char *name, U8 *data, U8 *ramdata, unsigned int carsize, unsigned int pos,
 					const U8 *buf, unsigned int size,int flags, int compmeth)
 {
 	unsigned int i,ret=0;
@@ -335,9 +338,9 @@ unsigned int insertPos(const char *name, U8 *data, unsigned int carsize, unsigne
 			SETMETADATA(data,pos+1,0,((stop/BANKSIZE)&0x7F)|0x80,stop,0);
 		}
 
-		data[SC_POS_OFFSET+3]='A'+(pos%26)-0x20;
-		data[SC_POS_OFFSET+4]='.'-0x20;
-		fillATASCII(&data[SC_POS_OFFSET+6],(U8 *)name,24);
+		ramdata[SC_POS_OFFSET+3]='A'+(pos%26)-0x20;
+		ramdata[SC_POS_OFFSET+4]='.'-0x20;
+		fillATASCII(&ramdata[SC_POS_OFFSET+6],(U8 *)name,24);
 	}
 	else
 	{
@@ -593,7 +596,7 @@ void process_inline_params(const char * addparams) {
 	} 
 }
 
-unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char *path, const char *addparams)
+unsigned int addPos(U8 *data, U8 *ramdata, unsigned int carsize, const char *name, const char *path, const char *addparams)
 {
 	static unsigned int pos=0;
 
@@ -722,12 +725,12 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 			if (do_compress && ((comprsize < size) || do_compress>=1)) // forced 
 			{
 				//flags|=choosen_compress_method<<5;
-				over=insertPos(name,data,carsize,pos,bufcompr,comprsize,flags,choosen_compress_method);
+				over=insertPos(name,data,ramdata,carsize,pos,bufcompr,comprsize,flags,choosen_compress_method);
 				incrsize=comprsize;
 			}
 			else if ((comprsize >= size)||!do_compress)
 			{
-				over=insertPos(name,data,carsize,pos,bufplain,size,flags,0);
+				over=insertPos(name,data,ramdata,carsize,pos,bufplain,size,flags,0);
 				incrsize=size;
 			}
 
@@ -785,7 +788,7 @@ unsigned int addPos(U8 *data, unsigned int carsize, const char *name, const char
 				// no break;
 			case (0x2010):
 				{
-					unsigned int over=insertPos(name,data,carsize,pos,&bufplain[16],0x2000,flags,0);
+					unsigned int over=insertPos(name,data,ramdata,carsize,pos,&bufplain[16],0x2000,flags,0);
 					if (over){
 						if (be_verbose)
 							printf("SKIPPED: \"%s\", does not fit, need %i bytes.\n",name,over);
@@ -877,7 +880,7 @@ U8 readLine(FILE *pf,char *name, char *path, char *add)
 	return status;
 }
 /*--------------------------------------------------------------------*/
-int addData(U8 *data, unsigned int carsize, const char *filemenu)
+int addData(U8 *data, U8 *ramdata, unsigned int carsize, const char *filemenu)
 {
 	char name[NAMELEN],path[PATHLEN],addparams[PARAMSLEN];
 	FILE *pf;
@@ -896,7 +899,7 @@ int addData(U8 *data, unsigned int carsize, const char *filemenu)
 				if (name[0]=='#')
 					continue;
 				if (status) 
-					i=addPos(data,carsize,name,path,addparams);
+					i=addPos(data,ramdata,carsize,name,path,addparams);
 				//outTable(data);
 			}
 			else
@@ -910,7 +913,7 @@ int addData(U8 *data, unsigned int carsize, const char *filemenu)
 			if (i>0) o++; // begin counting after some files added
 		};
 		// output summary info
-		addPos(0,carsize,0,0,0);
+		addPos(0,0,carsize,0,0,0);
 		int j;
 		//for (j=0; j<MAX_ENTRIES+1; j++)
 		//{
@@ -1114,7 +1117,7 @@ void addCTable(U8 * cardata, const char * colortablefile)
 	loadFile(colortablefile,&cardata[COLORTABLE_OFFSET],16);
 }
 /*--------------------------------------------------------------------*/
-void addPages(U8* data)
+void addPages(U8* data, U8* ramdata)
 {
 	int i=0;
 	while (i<MAX_ENTRIES_1) { if (IS_LAST(data,i)) {--i;break;} i++; }
@@ -1129,17 +1132,12 @@ void addPages(U8* data)
 	}
 
 	int pages=i/26;
-	data[FILL_PAGES_OFFSET+4]=pages;
+	data[FILL_PAGES_OFFSET+5]=pages;
 
 	if (pages>=1)
 		for (int page=0; page<=pages; page++)
 			for (int tpage=0; tpage<=pages; tpage++)
-				data[SCREENDATA_OFFSET+page*26*32+tpage*32]=tpage+17+128*(page==tpage);
-
-//	for (int page=0; page<pages; page++)
-//		for (int row=0; row<17; row++)
-//			for(int col=0; col<2; col++)
-//				data[SCREENDATA_OFFSET+page*26*32+(row+4)*32+col]=pagemap[page*2+(row)*8+col];
+				ramdata[SCREENDATA_OFFSET+page*26*32+tpage*32]=tpage+17+128*(page==tpage);
 }
 
 /*--------------------------------------------------------------------*/
@@ -1175,15 +1173,43 @@ int carbintoflasherxex(const char * carbinfile, const char * carname, int cart_s
 int menu4car(const char * filemenu, const char * logo, const char * colortablefile, const char * fontpath, const char * carname, int cart_size, int cart_size_physical, int default_do_compress)
 {
 	static U8 cardata[FLASHMAX];
+	static U8 ramdata[8192];
+	int i;
 	fillData(cardata, FLASHMAX, 0xFF);
+	fillData(ramdata, sizeof(ramdata), 0);
 	addMenu(cardata,FLASHMAX,menu4car_bin,menu4car_bin_len,19);
-	addLogo(cardata,logo,256*16,8);
 	addCTable(cardata,colortablefile);
-	addFont(cardata,fontpath);
-	int c=0;
-	if ((c=addData(cardata,cart_size,filemenu))) {
 
-		addPages(cardata);
+	for (i=0; i<ramdata_bin_len; i++) ramdata[i]=ramdata_bin[i];
+	addLogo(ramdata,logo,256*16,8);
+	addFont(ramdata,fontpath);
+
+	int c=0;
+	if ((c=addData(cardata,ramdata,cart_size,filemenu))) {
+
+		addPages(cardata,ramdata);
+
+		// COMPRESS ramdata
+		int delta;
+		int quick_mode=1;
+		int csize;
+
+		unsigned char * output_data = compress(
+				optimize(&ramdata[0], ramdata_bin_len, 0, quick_mode ? MAX_OFFSET_ZX7 : MAX_OFFSET_ZX0),
+				&ramdata[0], ramdata_bin_len,
+				0, 0, 1,
+				&csize, &delta
+				);
+
+		if (csize>=MENU_SPACE)
+		{
+			fprintf(stderr,"Too long entry list - no car file created.\n");
+			free(output_data);
+			return 0;
+		}
+
+		for (int c=0; c<csize; c++) cardata[c]=output_data[c];
+		free(output_data);
 
 		int output_type=checkTypeByPath(carname);
 
