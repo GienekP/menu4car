@@ -29,21 +29,25 @@
 /*--------------------------------------------------------------------*/
 typedef unsigned char U8;
 /*--------------------------------------------------------------------*/
-#define MENU_SPACE	4096	// space for compressed menu entries
+#define RAM_MENU_SPACE	4096	// space for compressed menu entries
+
 #define FLASHMAX (2*512*1024)
 #define BANKSIZE (0x2000)
 #define PATHLEN (0x400)
 #define NAMELEN (0x100)
 #define PARAMSLEN (8)
 #define DELIM	('|')
-#define MAX_ENTRIES	130
+#define MAX_PAGES	6
+#define MAX_ENTRIES	(MAX_PAGES*26)
 #define MAX_ENTRIES_1	(MAX_ENTRIES+1)
 
 #if ! defined(MIN)
 #define	MIN(a,b)	((a)>(b)?(b):(a))
 #endif
 
-// those types correspond to .asm file
+// those types correspond to .asm file ; do not change
+// bits 6,7(1-based) determine compression algorithm used
+// when TYPE_XEX.
 #define	TYPE_XEX	0b00000000
 #define TYPE_MASK_XEX	0b10000000
 #define TYPE_MASK	0b11100000
@@ -72,6 +76,7 @@ int be_verbose=0;
 int errorcounter=0;
 int skipcounter=0;
 int do_bin_output=0;
+int do_analyze=0;
 int default_do_compress=-1;
 int cartsizetab[]={32,64,128,256,512,1024};
 int xex_compress=0;
@@ -105,28 +110,7 @@ DictEntry UTF8Trans[] = {
 {"ö",0x06}, {"ü",0x09}, {"ß",0x0A}, {"£",0x08}, {"±",0x1B}, {"←",0x1E}, {"↑",0x1C}, {"→",0x1F},
 {"↓",0x1D}, {NULL,0}
 };
-/*
-U8 pagemap[] = {
-  0x80, 0x00, 0x0d, 0x00, 0x0d, 0x00, 0x0d, 0x00,
-  0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x91, 0x00, 0x11, 0x00, 0x11, 0x00, 0x11, 0x00,
-  0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x80, 0x00, 0x80, 0x00, 0x0d, 0x00, 0x0d, 0x00,
-  0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x12, 0x00, 0x92, 0x00, 0x12, 0x00, 0x12, 0x00,
-  0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x0d, 0x00, 0x80, 0x00, 0x80, 0x00, 0x0d, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00,
-  0x13, 0x00, 0x13, 0x00, 0x93, 0x00, 0x13, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00,
-  0x0d, 0x00, 0x0d, 0x00, 0x80, 0x00, 0x80, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00,
-  0x14, 0x00, 0x14, 0x00, 0x14, 0x00, 0x94, 0x00,
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00,
-  0x0d, 0x00, 0x0d, 0x00, 0x0d, 0x00, 0x80, 0x00
 
-};
-*/
 /*--------------------------------------------------------------------*/
 void fillData(U8 *cardata, unsigned int size, U8 byte)
 {
@@ -1132,7 +1116,7 @@ void addPages(U8* data, U8* ramdata)
 	}
 
 	int pages=i/26;
-	data[FILL_PAGES_OFFSET+5]=pages;
+	data[NUM_PAGES_OFFSET]=pages;
 
 	if (pages>=1)
 		for (int page=0; page<=pages; page++)
@@ -1201,7 +1185,7 @@ int menu4car(const char * filemenu, const char * logo, const char * colortablefi
 				&csize, &delta
 				);
 
-		if (csize>=MENU_SPACE)
+		if (csize>=RAM_MENU_SPACE)
 		{
 			fprintf(stderr,"Too long entry list - no car file created.\n");
 			free(output_data);
@@ -1242,6 +1226,7 @@ void usage() {
 	printf("	-t <path> - color table path (default rainbow, built in), 16 byte length of atari colors\n");
 	printf("	-o <path> - output car path (filetype: .car, .bin, .exe or .xex); no ext to save all .car, .bin and .xex.\n");
 	printf("	-b <path> - input binary car image path (type .car or .bin) to make the cart flasher of\n");
+	printf("	-a <path> - input binary car image path (type .car or .bin) to analyse\n");
 	printf("	-c <compression> - forced compression method 0/1/2/3/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
 	printf("	-f <path> - path to 1024 byte length font file\n");
 	printf("	-s <size> - logical cart size: 32/64/128/256/512/1024, default 1024\n");
@@ -1295,6 +1280,8 @@ int main( int argc, char* argv[] )
 						if (!has_val) usage();
 						outfile=argv[++i];
 						break;
+					case 'a':
+						do_analyze=1;
 					case 'b':
 						if (!has_val) usage();
 						carbinfilename=argv[++i];

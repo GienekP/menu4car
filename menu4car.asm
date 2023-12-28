@@ -16,7 +16,7 @@ VARIABLES   = (BASEE+CODEBUF)
 FREEMEM	= BASEE+CODEBUF+STORAGE+1
 
 screen_data = $8300 ; defined in ramdata.asm
-fonts = $9400 ; defined in ramdata.asm
+fonts = $9800 ; defined in ramdata.asm
 antic = $8200
 DLI_SCREEN_ADDR = $8214
 
@@ -150,13 +150,13 @@ RESETCD	= $E477
 ;-----------------------------------------------------------------------		
 ; Table of files:
 ; bank part of address
-tabbnk	:+(131) dta 0
+tabbnk	:+(157) dta 0
 ; in-bank adress lo byte 
-tabalo	:+(131) dta 0
+tabalo	:+(157) dta 0
 ; in-bank adress hi byte 
-tabahi	:+(131) dta 0
+tabahi	:+(157) dta 0
 ; translate table - position in menu
-tabpos	:+(131) dta 0
+tabpos	:+(157) dta 0
 
 STARTRAMDATA
 ; THERE IS DATA TO COPY TO RAM AREA WHEN CART IS OFF.
@@ -302,9 +302,11 @@ CopyUniY
 ; Keyboard Table
 ;		      A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
 KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,$2F,$28,$3E,$2D,$0B,$10,$2E,$16,$2B,$17
-		; 1 2 3 4 5
-		dta 31,30,26,24,29
+		; 1 2 3 4 5 6
+kdigits
+		dta 31,30,26,24,29,27
 keytbllen	=	*-KEYTBLE
+kdigits_num	=	*-kdigits
 
 ;-----------------------------------------------------------------------		
 reinit_e
@@ -543,14 +545,14 @@ MLOOP	jsr PAINT
 RANDOPT	lda RANDOM
 		cmp CNT
 		bcs RANDOPT
-		sta POS	; random pos, 0<=CNT<=129
+		sta POS	; random pos, 0<=CNT<6*26
 		bcc RESTORE ; with random  pos without key translation
 FINDKEY		dex
-		cpx #keytbllen-6
+		cpx #(keytbllen-kdigits_num-1)
 		bcc @+
 		txa
 		sec
-		sbc #keytbllen-5
+		sbc #(keytbllen-kdigits_num)
 		cmp NUMPAGES
 		bpl @+
 		clc
@@ -586,6 +588,7 @@ keynxt
 		;--------	
 		; Restore Screen	
 RESTORE
+		
 		jsr CopyCLR
 		lda #$00
 		sta DMACTL
@@ -801,9 +804,10 @@ PRLAST		ldy PAGE
 		dex
 		stx TMP
 @		rts		
-PAGES		dta	0,26,52,78,104
+PAGES		:6 dta	#*26
 		.print "#define	FILL_PAGES_OFFSET	0x",*-$a000
-FILLPAGES	dta	0,0,0,0,0
+FILLPAGES	:6 dta	0
+		.print "#define	NUM_PAGES_OFFSET	0x",*-$a000
 NUMPAGES	dta	0
 
 setScreen
@@ -817,9 +821,9 @@ setScreen
 		sta	DLI_SCREEN_ADDR+2
 		rts
 pageaddrs_lo
-		dta	<(0+screen_data),<($340+screen_data),<($340*2+screen_data),<($340*3+screen_data),<($340*4+screen_data)
-pageaddrs_hi
-		dta	>(0+screen_data),>($340+screen_data),>($340*2+screen_data),>($340*3+screen_data),>($340*4+screen_data)
+		:6 dta	<(#*$340+screen_data)
+pageaddrs_hi                                                                                                                                         
+		:6 dta	>(#*$340+screen_data)
 
 
 		

@@ -64,11 +64,11 @@ antic	:+1 dta $60
 		org $1000-104*32
 screen_data
 		.print "#define	SCREENDATA_OFFSET	0x",*
-		:+130 dta d'                                '
+		:+(6*26) dta d'                                '
 
 ;-----------------------------------------------------------------------		
 ; FONTS
-		ORG $1400
+		ORG $1800
 		
 		.print "#define	FONT_OFFSET		0x",*
 fonts		dta $00, $00, $00, $00, $00, $00, $00, $00, $00, $18, $18, $18, $18, $00, $18, $00
