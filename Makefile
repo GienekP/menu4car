@@ -1,23 +1,21 @@
 CC = gcc
 MAIN = menu4car
 
+# optional apultra
 PATH_TO_APULTRA=apultra/src/libapultra.h
 
 ifneq ("$(wildcard $(PATH_TO_APULTRA))","")
-USE_APULTRA = 1
 LFLAGS_APULTRA=apultra/libapultra$(SUF).a -Lapultra -lapultra$(SUF) -DAPULTRA
 O_APULTRA = libapultra$(SUF).a
 CFLAGS_APULTRA = -Iapultra/src/libdivsufsort/include -Iapultra/src -DAPULTRA
 else
-USE_APULTRA = 0
 LFLAGS_APULTRA = 
 CFLAGS_APULTRA = 
 endif
 
+# obligatory ZX0 - easy as 3 files are used straight from zx0 repo.
 LFLAGS_ZX0 = optimize$(SUF).o compress$(SUF).o memory$(SUF).o
 O_ZX0 = optimize$(SUF).o compress$(SUF).o memory$(SUF).o
-
-
 
 LFLAGS=$(LFLAGS_APULTRA) $(LFLAGS_ZX0) $(ARCH)
 CFLAGS=-c -O3 -g -fomit-frame-pointer $(CFLAGS_APULTRA) $(ARCH)

@@ -315,10 +315,10 @@ unsigned int insertPos(const char *name, U8 *data, U8 *ramdata, unsigned int car
 		else if ((flags & TYPE_MASK_XEX)==TYPE_XEX)
 		{
 			// update "last" flags - stop becomes start
-			data[DAOFFS(pos,0)]&=0x7f;
-			data[DAOFFS(pos,2)]&=~TYPE_MASK;
-			data[DAOFFS(pos,2)]|=flags|((compmeth&3)<<5);
-			data[DAOFFS(pos,3)]=pos;
+			data[DAOFFS(pos,0)]&=0x7f; // clear lastpos bit
+			data[DAOFFS(pos,2)]&=~TYPE_MASK; // clear type bits to indicate XEX
+			data[DAOFFS(pos,2)]|=flags|((compmeth&3)<<5); // apply compression bits
+			data[DAOFFS(pos,3)]=pos; // this entry is at pos which grows by one and never scrambled.
 
 			// append with data
 			for (i=0; i<size; i++) {data[start+i]=buf[i];};
@@ -326,6 +326,7 @@ unsigned int insertPos(const char *name, U8 *data, U8 *ramdata, unsigned int car
 			SETMETADATA(data,pos+1,0,((stop/BANKSIZE)&0x7F)|0x80,stop,0);
 		}
 
+		// at pos we add name of the file.
 		ramdata[SC_POS_OFFSET+3]='A'+(pos%26)-0x20;
 		ramdata[SC_POS_OFFSET+4]='.'-0x20;
 		fillATASCII(&ramdata[SC_POS_OFFSET+6],(U8 *)name,24);
@@ -1239,12 +1240,16 @@ void usage() {
 	printf("	-o <path> - output car path (filetype: .car, .bin, .exe or .xex); no ext to save all .car, .bin and .xex.\n");
 	printf("	-b <path> - input binary car image path (type .car or .bin) to make the cart flasher of\n");
 	printf("	-a <path> - input binary car image path (type .car or .bin) to analyse\n");
-	printf("	-c <compression> - forced compression method 0/1/2/3/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
+	printf("	-c <compression> - forced compression method 0"
+#ifdef APULTRA
+	"/1/2"
+#endif
+	"/3/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
 	printf("	-f <path> - path to 1024 byte length font file\n");
 	printf("	-s <size> - logical cart size: 32/64/128/256/512/1024, default 1024\n");
 	printf("	-S <size> - physical cart size: 32/64/128/256/512/1024, default as logical; if set must be after -s\n");
 	printf("	-X <path> - offline block compress *.xex file to *.bzx0 for latter use (ignores all other switches)\n");
-	printf("	-v - be verbose\n");
+	printf("	-v[v][v] - be verbose, level 1,2 or 3\n");
 	printf("	-? - this help\n\n");
 #ifndef __MINGW__
 	exit(EX_USAGE);
