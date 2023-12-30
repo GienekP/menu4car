@@ -292,8 +292,10 @@ unsigned int insertPos(const char *name, U8 *data, U8 *ramdata, unsigned int car
 			int lcartstart=0; // by default
 			int lcartbank=lcartpos>=0?GETBANK(data,lcartpos):0;
 			// lcartbank = 0 when no carts, 1 when one cart etc
-			//if (lcartpos>=0) 
-			lcartstart=GETADDR(data,lcartpos);
+			if (lcartpos>=0) 
+				lcartstart=GETADDR(data,lcartpos);
+			else
+				lcartstart=0;
 			lcartstart+=BANKSIZE;
 
 			//printf("lcartpos: %d lcartbank: %d lcartstart: %06x\n",lcartpos,lcartbank,lcartstart);
@@ -546,18 +548,6 @@ int checkTypeByPath(const char * filename) {
 
 
 /*--------------------------------------------------------------------*/
-void process_input_types(const char * path, int * flags) {
-/*
-		0->	LOADXEX
-		1->	LOADBOOT
-		2->	LOADATR
-		3->	LOADBASIC
-		4->	LOADCAR
-*/
-	*flags=checkTypeByPath(path);
-	if (*flags>=20) *flags=TYPE_UNKNOWN;
-}
-/*--------------------------------------------------------------------*/
 void process_inline_params(const char * addparams) {
 	int i=0;
 	// default values
@@ -628,7 +618,7 @@ unsigned int addPos(U8 *data, U8 *ramdata, unsigned int carsize, const char *nam
 	}
 
 	process_inline_params(addparams);
-	process_input_types(path,&flags);
+	flags=checkTypeByPath(path);
 
 	if (flags==TYPE_UNKNOWN || flags==TYPE_BIN) return pos;
 
