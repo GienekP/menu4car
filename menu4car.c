@@ -9,6 +9,7 @@
 #endif
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
 
@@ -19,7 +20,11 @@
 #include <sys/param.h>
 #include <errno.h>
 
+#ifdef APULTRA
 #include "libapultra.h"
+//include "apultra/src/libapultra.h"
+#endif
+
 #include "ZX0/src/zx0.h"
 #define MAX_OFFSET_ZX0    32640
 #define MAX_OFFSET_ZX7     2176
@@ -69,7 +74,6 @@ typedef unsigned char U8;
 /*--------------------------------------------------------------------*/
 #include "ramdata.h"
 #include "menu4car.h"
-#include "apultra/src/libapultra.h"
 /*--------------------------------------------------------------------*/
 int do_compress=1;
 int be_verbose=0;
@@ -463,7 +467,7 @@ unsigned int compressBlockByBlock(int comprmethod, U8 *bufin, unsigned int retsi
 			PUTW(bufout,o,start);
 
 			int tsize=(1+stop-start);
-			int csize=0;
+			int csize=tsize;
 
 			i+=4;
 			o+=4;
@@ -472,6 +476,7 @@ unsigned int compressBlockByBlock(int comprmethod, U8 *bufin, unsigned int retsi
 			if (tsize>=COMPRESSION_THRESHOLD) {
 				for (j=o; j<MIN(o+tsize,FLASHMAX); j++) {bufout[j]=0;};
 				switch(comprmethod) {
+#ifdef APULTRA
 					case COMPRESS_APL:
 						csize= apultra_compress(&bufin[i],
 								&bufout[o],
@@ -483,6 +488,7 @@ unsigned int compressBlockByBlock(int comprmethod, U8 *bufin, unsigned int retsi
 								NULL,
 								NULL);
 						break;
+#endif
 					case COMPRESS_ZX0:
 						{
 							int delta;
@@ -498,6 +504,8 @@ unsigned int compressBlockByBlock(int comprmethod, U8 *bufin, unsigned int retsi
 							free(output_data);
 							//printf("Compress: %d to %d, offset %04x\n",tsize,csize,o);
 						}
+						break;
+					default:
 						break;
 				}
 			}
@@ -563,8 +571,10 @@ void process_inline_params(const char * addparams) {
 					do_compress=-1; 
 					break;
 				case '0':
+#ifdef APULTRA
 				case '1':
 				case '2':
+#endif
 				case '3':
 					do_compress=addparams[i]-'0';
 					break;
@@ -643,6 +653,7 @@ unsigned int addPos(U8 *data, U8 *ramdata, unsigned int carsize, const char *nam
 		if (size) {
 			int comprsize=0;
 			int choosen_compress_method=0;
+#ifdef APULTRA
 			if (do_compress==-1 || do_compress==1) {
 				/**
 				 * Compress memory
@@ -683,6 +694,7 @@ unsigned int addPos(U8 *data, U8 *ramdata, unsigned int carsize, const char *nam
 
 				}
 			}
+#endif
 			if (do_compress==-1 || do_compress==3) {
 
 				int comprsize2=compressBlockByBlock(COMPRESS_ZX0,bufplain,size,bufcompr2);
@@ -1295,8 +1307,10 @@ int main( int argc, char* argv[] )
 									default_do_compress=-1;
 									break;
 								case '0':
+#ifdef APULTRA
 								case '1':
 								case '2':
+#endif
 								case '3':
 									default_do_compress=argv[i][0]-'0';
 									break;

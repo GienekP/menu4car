@@ -1,7 +1,26 @@
 CC = gcc
 MAIN = menu4car
-LFLAGS=apultra/libapultra$(SUF).a optimize$(SUF).o compress$(SUF).o memory$(SUF).o -Lapultra -lapultra$(SUF) $(ARCH)
-CFLAGS=-c -O3 -g -fomit-frame-pointer -Iapultra/src/libdivsufsort/include -Iapultra/src $(ARCH)
+
+PATH_TO_APULTRA=apultra/src/libapultra.h
+
+ifneq ("$(wildcard $(PATH_TO_APULTRA))","")
+USE_APULTRA = 1
+LFLAGS_APULTRA=apultra/libapultra$(SUF).a -Lapultra -lapultra$(SUF) -DAPULTRA
+O_APULTRA = libapultra$(SUF).a
+CFLAGS_APULTRA = -Iapultra/src/libdivsufsort/include -Iapultra/src -DAPULTRA
+else
+USE_APULTRA = 0
+LFLAGS_APULTRA = 
+CFLAGS_APULTRA = 
+endif
+
+LFLAGS_ZX0 = optimize$(SUF).o compress$(SUF).o memory$(SUF).o
+O_ZX0 = optimize$(SUF).o compress$(SUF).o memory$(SUF).o
+
+
+
+LFLAGS=$(LFLAGS_APULTRA) $(LFLAGS_ZX0) $(ARCH)
+CFLAGS=-c -O3 -g -fomit-frame-pointer $(CFLAGS_APULTRA) $(ARCH)
 SYSTEM = $(shell uname -s -m)
 
 ifeq ($(SYSTEM)$(ARCH),Darwin arm64)
@@ -17,7 +36,7 @@ $(MAIN).arm64: $(MAIN).c $(MAIN).h
 
 else
 
-$(MAIN)$(SUF): $(MAIN)$(SUF).o compress$(SUF).o optimize$(SUF).o memory$(SUF).o libapultra$(SUF).a
+$(MAIN)$(SUF): $(MAIN)$(SUF).o $(O_ZX0) $(O_APULTRA) 
 	@echo "DOING " $@
 	$(CC) "$<" $(LFLAGS) -o $@
 
