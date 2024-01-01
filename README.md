@@ -83,7 +83,7 @@ Tools like make, bash, awk, sed should work now.
 
 ### for all systems then:
 
-You will need mads/mads.exe which can be downloaded from https::github.com/tebe6502/Mad-Assembler from bin/<SO>/ catalog.
+You will need mads_*/mads.exe which can be downloaded from https::github.com/tebe6502/Mad-Assembler from bin/<SO>/ catalog.
 You will also need git for convenience (I personally have it installed under WSL and switch from env to env, but it can be installed separately)
 
 If you do not want to use git, you can download the code from repositories below by hand from github (as zip) and set them by hand (https://github.com/GienekP/menu4car and https://github.com/emmanuel-marty/apultra)
@@ -98,7 +98,7 @@ To init submodules, type:
     git submodule init
     git submodule update
     
-In case "by hand" the apultra content should be placed in menu4car/apultra catalog.
+In case "by hand" the apultra content should be placed in menu4car/apultra catalog. Apultra content is optional. ZX0 is obligatory.
 
 Then type "make" to make dependences (apultra library) and the menu4car itself.
 
@@ -108,7 +108,7 @@ Optionally go to the "tools" tirectory and type "make" to build homesoft atr con
 
 The main author of main functionality: menu, xex reading - GienekP
 
-The add-ons: cmdline arguments, optimization, compression, cartridge handling, 4-page navigation, xex flasher generation - Jakub Husak
+The add-ons: cmdline arguments, optimization, compression, 8kB cartridge handling, 6-page navigation, xex flasher generation - Jakub Husak
 
 The apultra 6502 decompressor by xxl (incompatibility of apultra compressed output with aplib spec fixed by him, also); also zx0 6502 decompressor by him.
 
