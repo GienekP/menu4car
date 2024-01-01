@@ -6,6 +6,6 @@
 #define         CARTSIZE2 0x009E
 #define         TWO_CHIPS_SWITCH         0x0208
 #define         TWO_CHIPS_SWITCH_ADDR         0x2202
-#define         END_OF_MAIN_CODE         0x0AAE
+#define         END_OF_MAIN_CODE         0x0AB7
 #define         BLK_BANKNUM 0x0004
 #define         BLK_SOURCE 0x0009

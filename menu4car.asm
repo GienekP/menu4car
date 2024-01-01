@@ -419,7 +419,7 @@ CONTIN
 		sta GINTLK
 		lda #0
 		sta CRITIC
-skip
+?skip
 
 		jsr reinit_e
 
