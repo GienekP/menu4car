@@ -264,7 +264,7 @@ DISCARTE
 		.print "RAMDATALEN: ",*-STARTRAMDATA
 ;-----------------------------------------------------------------------		
 ; Copy Clear to BASEE
-CopyCLR		ldx #(CLPRE-CLPRS-1)
+CopyCLR		ldx #(CLPRE-CLPRS)
 		ldy #(CLPRE-STARTRAMDATA)
 		jsr CopyUniY
 		lda #0
@@ -402,6 +402,9 @@ CONTIN
 		lda #$01
 		sta BASICF
 
+		lda tabbnk+1
+		bmi ?skip
+
 		lda #1
 		sta CRITIC
 		lda #$00
@@ -416,6 +419,7 @@ CONTIN
 		sta GINTLK
 		lda #0
 		sta CRITIC
+skip
 
 		jsr reinit_e
 
@@ -507,8 +511,8 @@ CONTIN
 		;--------
 		; RUN if only one pos
 		stx CNT	; store counted entries
-		sta POS ; just in case if one pos
 		dex
+		stx POS ; just in case if one pos
 		jeq RESTORE
 		lda #$0
 		sta TMP

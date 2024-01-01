@@ -88,6 +88,8 @@ clean:
 	rm -f *.lab
 	rm -f *.lst
 	rm -f menu4car.bin
+	rm -f menu4car.h
+	rm -f ramdata.h
 	rm -f ramdata.bin
 	rm -f menu4car.arm64
 	rm -f menu4car.x86_64
