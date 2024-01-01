@@ -110,7 +110,7 @@ The main author of main functionality: menu, xex reading - GienekP
 
 The add-ons: cmdline arguments, optimization, compression, cartridge handling, 4-page navigation, xex flasher generation - Jakub Husak
 
-The apultra decompressor by xxl (incompatibility of apultra compressed output with aplib spec fixed by him, also); also zx0 decompressor by him.
+The apultra 6502 decompressor by xxl (incompatibility of apultra compressed output with aplib spec fixed by him, also); also zx0 6502 decompressor by him.
 
 The apultra compressor by Emmanuel Marty.
 
