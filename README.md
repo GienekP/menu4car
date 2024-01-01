@@ -113,3 +113,5 @@ The add-ons: cmdline arguments, optimization, compression, cartridge handling, 4
 The apultra decompressor by xxl (incompatibility of apultra compressed output with aplib spec fixed by him, also); also zx0 decompressor by him.
 
 The apultra compressor by Emmanuel Marty.
+
+The ZX0 compressor by Einar Saukas.
