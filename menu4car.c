@@ -170,6 +170,7 @@ void fillATASCII(U8 *txt, const U8 *name, unsigned int limit)
 /*--------------------------------------------------------------------*/
 #define DAOFFS(i,f) (DATAARRAY_OFFSET+(i)+(f)*MAX_ENTRIES_1)
 #define GETADDR(_data,_pos)	(((_data[DAOFFS(_pos,0)]&0x7f)*BANKSIZE)|(((_data[DAOFFS(_pos,2)]<<8)|_data[DAOFFS(_pos,1)])&0x1FFF))
+#define SETADDR(_data,_pos,_type,_last,_value)	{_data[DAOFFS(_pos,0)]=((_value)/BANKSIZE)&0x7f|(_last);_data[DAOFFS(_pos,2)]=((_value)>>8)&0x1f|(_type);_data[DAOFFS(_pos,1)]=(_value)&0xFF;}
 #define GETBANK(_data,_pos)	(_data[DAOFFS(_pos,0)]&0x7f)
 #define BANK(_data,_pos)	(_data[DAOFFS(_pos,0)])
 #define GETTYPE(_data,_pos)	(_data[DAOFFS(_pos,2)]&TYPE_MASK)
@@ -204,19 +205,19 @@ void outTable(U8 * data) {
 }
 
 /*--------------------------------------------------------------------*/
-int getRoomFor8kBCart(U8 * data,int carsize, int start,int ipos, const U8 * cbuf)
+int getRoomForAlignedImage(U8 * data,int carsize, int start,int ipos, const U8 * cbuf, int length)
 {
 	// 1. move data one bank up.
 	// get start addr
-	int stop=start;
+	int cartdataend=start;
 
 	// get last stop addr
 	int i=0;
 	while (i<MAX_ENTRIES){
 		if (IS_LAST(data,i)) {
-			stop=GETADDR(data,i);
+			cartdataend=GETADDR(data,i);
 			if (be_verbose>=2) {
-				printf("Found end at pos %d, value: %06x\n",i,stop);
+				printf("Found end at pos %d, value: %06x\n",i,cartdataend);
 				break;
 			}
 		}
@@ -224,21 +225,21 @@ int getRoomFor8kBCart(U8 * data,int carsize, int start,int ipos, const U8 * cbuf
 	}
 
 	// now copy data 8kB up
-	//if (stop==0) stop=start;
-	//printf("Moving 8kB to free place for cart, size: %04x, %06x-%06x to %06x-%06x\n",stop-start,start,stop,start+0x2000,stop+0x2000);
+	//if (cartdataend==0) cartdataend=start;
+	//printf("Moving 8kB to free place for cart, size: %04x, %06x-%06x to %06x-%06x\n",cartdataend-start,start,cartdataend,start+0x2000,cartdataend+0x2000);
 	//outTable(data);
 	i=0;
-	if (stop>carsize-0x2000) {
+	if (cartdataend>carsize-length) {
 		return 1; // no room, return with error
 	}
-	printf("Cart image stored at: %06x\n",start);
+	printf("Image stored at: %06x\n",start);
 
-	for (int k=stop-1; k>=start; k--) {
-		data[k+0x2000]=data[k];
-		data[k]=0;
+	for (int k=cartdataend-1; k>=start; k--) {
+		data[k+length]=data[k];
+		//data[k]=0;
 		//printf("%06x ",k);
 	}
-	for (i=0; i<0x2000; i++) {data[start+i]=cbuf[i];};
+	for (i=0; i<length; i++) {data[start+i]=cbuf[i];};
 
 	// also moving entries and store under current
 	i=MAX_ENTRIES-1;
@@ -252,10 +253,17 @@ int getRoomFor8kBCart(U8 * data,int carsize, int start,int ipos, const U8 * cbuf
 	// 2. update pos chain by adding 1 to banks of not carts
 	while (i<MAX_ENTRIES_1)
 	{
-		if (GETTYPE(data,i)!=TYPE_CAR)
-			BANK(data,i)++; // inc bank and mark free 8kB
+		int t;
+		int last=0;
+		if ((t=GETTYPE(data,i))!=TYPE_CAR)
+		{
+			long addr=GETADDR(data,i);
+			addr+=length;
+			last=IS_LAST(data,i);
+			SETADDR(data,i,t,last,addr);
+		}
+		if (last) break;
 
-		if (IS_LAST(data,i)) break;
 		i++;
 	}
 	return 0; // ok.
@@ -284,7 +292,7 @@ unsigned int insertPos(const char *name, U8 *data, U8 *ramdata, unsigned int car
 		// if is CAR then copy slot to next before setting
 		// on the asm side there will be two POSes, one for START
 		// and second for STOP
-		if (flags==TYPE_CAR) { // move the last to next slot
+		if (flags==TYPE_CAR || flags==TYPE_ATR) { // move the last to next slot
 			// insert car data:
 			// find last cart slot and get the bank, or -1 if not found any
 			int lcartpos=findLastCarPos(data);
@@ -300,8 +308,9 @@ unsigned int insertPos(const char *name, U8 *data, U8 *ramdata, unsigned int car
 
 			//printf("lcartpos: %d lcartbank: %d lcartstart: %06x\n",lcartpos,lcartbank,lcartstart);
 			//outTable(data);
+			int res=getRoomForAlignedImage(data,carsize,lcartstart,lcartbank,buf,size);
 
-			if (0==getRoomFor8kBCart(data,carsize,lcartstart,lcartbank,buf))
+			if (0==res)
 			{
 				SETMETADATA(data,lcartbank,flags,lcartbank+1,lcartstart,pos);
 				//move last entry one pos up
@@ -313,6 +322,9 @@ unsigned int insertPos(const char *name, U8 *data, U8 *ramdata, unsigned int car
 				ret=stop-carsize;
 				stop=start;
 			}
+		}
+		else if (flags==TYPE_BAS){
+
 		}
 		else if ((flags & TYPE_MASK_XEX)==TYPE_XEX)
 		{
@@ -787,7 +799,7 @@ unsigned int addPos(U8 *data, U8 *ramdata, unsigned int carsize, const char *nam
 				}
 				break;
 			default:
-				printf("ERROR: \"%s\", only <=8k cartridges are handled (size: %04x)\n",name,size);
+				printf("ERROR: \"%s\", only <=8k cartridges are handled (size: 0x%04x)\n",name,size);
 				errorcounter++;
 		}
 	}
