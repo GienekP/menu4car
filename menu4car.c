@@ -1222,7 +1222,7 @@ int menu4car(const char * filemenu, const char * logo, const char * colortablefi
 }
 void usage() {
 	printf("Menu4CAR - ver: %s\n",__DATE__);
-	printf("(c) GienekP\n\n");
+	printf("(c) GienekP & jhusak\n\n");
 	printf("usage:\nmenu4car menu.txt <options>\n");
 	printf("\nOptions:\n");
 	printf("	-p <path> - picdata path (default Menu4Car, built in), raw 8-bit b&w 512 byte length\n");
