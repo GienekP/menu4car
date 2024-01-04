@@ -1,6 +1,6 @@
 # MENU2CAR
 
-This utility let's you create a MaxFlash/JCart cart image with your favourite Atari 8-bit games.
+This utility let's you create a AtariMaxFlash/JatariCart cart image with your favourite Atari 8-bit games.
 Also, XEX flasher ready to write do some media may be created. No more additional tools!
 In addition XEX flasher may be created for any .car or .bin file.
 
