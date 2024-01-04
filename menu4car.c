@@ -77,7 +77,7 @@ typedef unsigned char U8;
 #include "menu4car.h"
 /*--------------------------------------------------------------------*/
 int do_compress=1;
-int do_force=1;
+int do_force=0;
 int be_verbose=0;
 int errorcounter=0;
 int skipcounter=0;
@@ -407,7 +407,7 @@ int repairFile(U8 *buf, int size)
 	int i=0,j,first=0xFFFF,run=0,init=0,resultsize=size;
 
 #define BYTES_IN_BUF(i,resultsize) ((resultsize)-(i))
-#define HANDLE_LESS_THAN_4 if(do_force){if(BYTES_IN_BUF(i,resultsize)<4){return resultsize;}}
+#define HANDLE_LESS_THAN_4 if(BYTES_IN_BUF(i,resultsize)<4) return do_force?resultsize:0;
 
 	
 	if ((resultsize>2) && GETW(buf,0)==0xFFFF )
@@ -657,6 +657,9 @@ unsigned int addPos(U8 *data, U8 *ramdata, unsigned int carsize, const char *nam
 		if (be_verbose)
 			printf("type XEX... ");
 		size=repairFile(bufplain,size);
+		printf("SIZE %d\n",size);
+
+		
 		// compress file, get new size.
 		if (size) {
 			int comprsize=0;
