@@ -14,7 +14,7 @@ The example file menu4car.txt contains an input in form of sort of csv file, sep
 The first field is the name of the game in readable form. Only first 24 chars will be copied.
 The second field is the path to the DOS binary executable , or 1k, 2k, 4k, 8k .car cartridge image format.
 
-Cartridge .car images are treated as ordinary 8kB cartridges and must have headers and '.car' extension. When mounted, system sees them as original cartridge (they sit in one of the bankk in JCart so they are real carts)
+Cartridge .car images are treated as ordinary 8kB cartridges and must have headers and '.car' extension. When mounted, system sees them as original cartridge (they sit in one of the banks in JCart so they act as real carts)
 
 
 In the future more file types will be handled (planned ATR files)
