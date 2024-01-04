@@ -103,6 +103,7 @@ RUNAD   = $02E0
 MEMTOP  = $02E5
 MEMLO   = $02E7
 CHBAS   = $02F4
+CH	= $02FC
 
 ICCMD   = $0342
 ICBUFA  = $0344
@@ -421,7 +422,6 @@ CONTIN
 		sta CRITIC
 ?skip
 
-		jsr reinit_e
 
 		; Set Menu
 		lda TMP
@@ -537,15 +537,17 @@ MLOOP	jsr PAINT
 		sta KBCODE
 		lda SKSTAT
 		and #$04
-		cmp #$04
-		beq MLOOP
-		
+		bne MLOOP
+
 		lda KBCODE
+		ldx #$ff
+		stx CH
 		ldx #keytbllen
 @		cmp KEYTBLE,X
 		beq	FINDKEY
 		dex
 		bne @-
+
 RANDOPT	lda RANDOM
 		cmp CNT
 		bcs RANDOPT
@@ -592,7 +594,6 @@ keynxt
 		;--------	
 		; Restore Screen	
 RESTORE
-		
 		jsr CopyCLR
 		lda #$00
 		sta DMACTL
@@ -616,6 +617,8 @@ RESTORE
 		sta TMP+1
 		lda STORE
 		sta TMP
+
+		jsr reinit_e
 
 		;--------	
 		; Load XEX		
@@ -888,32 +891,32 @@ READRAWXEX
 ; --------------------------------------------------
 ERRORWM		jmp RESETCD 	; Warm Reset if ERROR
 @		jsr IncSrc
-		beq ERRORWM
+		beq go_rts
 		jsr GET_FROM_CAR
 		cmp #$FF
 		beq LOOP
-		bne ERRORWM
+		bne go_rts
 LOOP		jsr IncSrc
-		beq ERRORWM
+		beq go_rts
 		
-READBLC		jsr GET_FROM_CAR			; Read LSB
+READBLC		jsr GET_FROM_CAR	; Read LSB
 		STA DST
 		jsr IncSrc		; SRC++
-		beq ERRORWM		; ERROR NoDATA
+		beq go_rts		; NoDATA - finish loading and live with it
 
-		jsr GET_FROM_CAR			; Read HSB
+		jsr GET_FROM_CAR	; Read HSB
 		sta DST+1
 		jsr IncSrc
-		beq ERRORWM		; ERROR NoDATA
+		beq go_rts		; NoDATA - finish loading and live with it
 		
 		jsr GET_FROM_CAR
 		sta CNT			; Set Last Write LSB
 		jsr IncSrc
-		beq ERRORWM
+		beq go_rts
 		jsr GET_FROM_CAR
 		sta CNT+1		; Set Last Write MSB
 		jsr IncSrc
-		beq ERRORWM
+		beq go_rts
 		lda DST			; this handles
 		ora DST+1		; reading run
 		beq TRANSF		; of zeros at the end mostly
@@ -934,6 +937,7 @@ aplgo
 compgo
 		jsr CheckSrc
 		bne READBLC
+go_rts
 		rts
 
 TRANSF		jsr GET_FROM_CAR			; Read BYTE
@@ -948,7 +952,7 @@ TRANSF		jsr GET_FROM_CAR			; Read BYTE
 		bne @+
 		inc DST+1
 @		jsr IncSrc		; Increment Source
-		beq ERRORWM		; ERROR NoDATA
+		beq go_rts		; NoDATA - finish and live with it!
 		bne TRANSF		; Repeat transfer byte
 		
 ENDBLK		lda INITAD		; End DOS block
@@ -983,17 +987,20 @@ READAPL256XEX
 		jmp	aPL_depack
 continue
 		; we have got the first byte
+		; ignore it, because it was checked in .c side
 		; uncompress second byte
 		GET_COMP_BYTE
 
 		jmp CLOOP
 
 
-CERRORWM	jmp RESETCD		; fill-up code
-		bcs CERRORWM
-		GET_COMP_BYTE
-		cmp #$FF
-		bne CREADBLC
+CERRORWM	sec
+		rts
+		;jmp RESETCD		; fill-up code
+		;bcs CERRORWM
+		;GET_COMP_BYTE
+		;cmp #$FF
+		;bne CREADBLC
 CLOOP
 		bcs CERRORWM
 		

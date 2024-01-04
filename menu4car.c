@@ -64,6 +64,7 @@ typedef unsigned char U8;
 
 // this is for another use, for output without car header
 #define TYPE_BIN	20
+#define TYPE_XFD	21
 #define TYPE_UNKNOWN	-1
 
 // provided from .asm mads compile
@@ -76,6 +77,7 @@ typedef unsigned char U8;
 #include "menu4car.h"
 /*--------------------------------------------------------------------*/
 int do_compress=1;
+int do_force=1;
 int be_verbose=0;
 int errorcounter=0;
 int skipcounter=0;
@@ -232,7 +234,7 @@ int getRoomForAlignedImage(U8 * data,int carsize, int start,int ipos, const U8 *
 	if (cartdataend>carsize-length) {
 		return 1; // no room, return with error
 	}
-	printf("Image stored at: %06x\n",start);
+	printf("Image stored at: %06x, len: %06x\n",start,length);
 
 	for (int k=cartdataend-1; k>=start; k--) {
 		data[k+length]=data[k];
@@ -402,49 +404,51 @@ void saveFile(const char * tname, U8 *raw, unsigned int size)
 /*--------------------------------------------------------------------*/
 int repairFile(U8 *buf, int size)
 {
-	int i=0,j,first=0xFFFF,run=0,init=0,ret=size;
+	int i=0,j,first=0xFFFF,run=0,init=0,resultsize=size;
 
-#define BYTES_IN_BUF(i,ret) ((ret)-(i))
+#define BYTES_IN_BUF(i,resultsize) ((resultsize)-(i))
+#define HANDLE_LESS_THAN_4 if(do_force){if(BYTES_IN_BUF(i,resultsize)<4){return resultsize;}}
 
 	
-	if ((ret>2) && GETW(buf,0)==0xFFFF )
+	if ((resultsize>2) && GETW(buf,0)==0xFFFF )
 	{
 		if (be_verbose>=3) fprintf(stderr,"Atari binary file header read: 0xff 0xff\n");
 		unsigned int a,b,start,stop;
 		i+=2;
-		while (BYTES_IN_BUF(i,ret)>=4)
+		while (BYTES_IN_BUF(i,resultsize)>0)
 		{
-			while (BYTES_IN_BUF(i,ret)>=4) {
-				if  (GETW(buf,i)==0xFFFF)
-				{
-					if (be_verbose>=3) fprintf(stderr,"uneven binary file header read: 0xff 0xf; removing.\n");
-					for (j=i; j<ret; j++) {buf[j]=buf[j+2];};
-					ret-=2;
-				}
-				else
-					break;
+			int skip=0;
+			while (BYTES_IN_BUF(i,resultsize)>=2) {
+				if  (GETW(buf,i+skip)!=0xFFFF) break;
+
+				skip+=2;
+				if (be_verbose>=3) fprintf(stderr,"uneven binary file header read: 0xff 0xff; removing.\n");
 			}
 
-			if (BYTES_IN_BUF(i,ret)>=4) {
-				start = GETW(buf,i);
-				if (be_verbose>=3) fprintf(stderr,"BLOCK: %04x-",start);
-				stop  = GETW(buf,i+2);
-				if (be_verbose>=3) fprintf(stderr,"%04x\n",stop);
-				i+=4;
+			if (skip) {
+				for (j=i; j<resultsize; j++) {buf[j]=buf[j+skip];};
+				resultsize-=skip;
 			}
-			else
-				return 0;
+
+			HANDLE_LESS_THAN_4;
+
+			start = GETW(buf,i);
+			if (be_verbose>=3) fprintf(stderr,"BLOCK: %04x-",start);
+			stop  = GETW(buf,i+2);
+			if (be_verbose>=3) fprintf(stderr,"%04x\n",stop);
+			i+=4;
 
 			if (start>stop)
-				return 0;
+				return do_force?resultsize:0;
 
-			if (BYTES_IN_BUF(i,ret)<1+stop-start) return 0;
+			if (BYTES_IN_BUF(i,resultsize)<1+stop-start) return do_force?resultsize:0;
+
 			if (first==0xFFFF) {first=start;};
 			if ((start<=0x02E0) && (stop>=0x02E1)) { run=1; };
 			if ((start<=0x02E2) && (stop>=0x02E3)) {init=1;};
 			i+=(1+stop-start);
 		};
-		if (BYTES_IN_BUF(i,ret)>0) return 0;
+		//if (BYTES_IN_BUF(i,resultsize)>0) return do_force?resultsize:0;
 
 		if (!init && !run)
 		{
@@ -452,15 +456,15 @@ int repairFile(U8 *buf, int size)
 			U8 runad[6]={0xE0, 0x02, 0xE1, 0x02, 0xFF, 0xFF};
 			runad[4]=(first&0xFF);
 			runad[5]=((first>>8)&0xFF);
-			for (i=0; i<6; i++) {buf[ret+i]=runad[i];};
-			ret+=6;
-			return ret;
+			for (i=0; i<6; i++) {buf[resultsize+i]=runad[i];};
+			resultsize+=6;
+			return resultsize;
 		};
 	}
 	else
 		return 0;
 
-	return ret;
+	return resultsize;
 }
 /*--------------------------------------------------------------------*/
 unsigned int compressBlockByBlock(int comprmethod, U8 *bufin, unsigned int retsize, U8 * bufout)
@@ -510,7 +514,7 @@ unsigned int compressBlockByBlock(int comprmethod, U8 *bufin, unsigned int retsi
 							int quick_mode=1;
 
 							unsigned char * output_data = compress(
-									optimize(&bufin[i], tsize, 0, quick_mode ? MAX_OFFSET_ZX7 : MAX_OFFSET_ZX0),
+									optimize(&bufin[i], tsize, 0, quick_mode ? MAX_OFFSET_ZX7 : MAX_OFFSET_ZX0,0),
 									&bufin[i], tsize,
 									0, 0, 1,
 									&csize, &delta
@@ -554,6 +558,7 @@ int checkTypeByPath(const char * filename) {
 	if (TSTEXT(filename,".obx")) return TYPE_XEX;
 	if (TSTEXT(filename,".com")) return TYPE_XEX;
 	if (TSTEXT(filename,".atr")) return TYPE_ATR;
+	if (TSTEXT(filename,".xfd")) return TYPE_XFD;
 	if (TSTEXT(filename,".bot")) return TYPE_BOOT;
 	return TYPE_UNKNOWN;
 }
@@ -767,6 +772,21 @@ unsigned int addPos(U8 *data, U8 *ramdata, unsigned int carsize, const char *nam
 			printf("\n");
 			errorcounter++;
 		}
+	}
+	else if (filetype==TYPE_ATR || filetype==TYPE_XFD)
+	{
+		int offset=(filetype==TYPE_ATR)?16:0;
+		flags=TYPE_ATR;
+		unsigned int over=insertPos(name,data,ramdata,carsize,pos,&bufplain[offset],size-offset,flags,0);
+		if (over){
+			if (be_verbose)
+				printf("SKIPPED: \"%s\", does not fit, need %i bytes.\n",name,over);
+		} else {
+			osize+=size-offset;
+			ncsize+=size-offset;
+			advance=1;
+		}
+
 	}
 	else if (filetype==TYPE_CAR)
 	{
@@ -1194,7 +1214,7 @@ int menu4car(const char * filemenu, const char * logo, const char * colortablefi
 		int csize;
 
 		unsigned char * output_data = compress(
-				optimize(&ramdata[0], ramdata_bin_len, 0, quick_mode ? MAX_OFFSET_ZX7 : MAX_OFFSET_ZX0),
+				optimize(&ramdata[0], ramdata_bin_len, 0, quick_mode ? MAX_OFFSET_ZX7 : MAX_OFFSET_ZX0,0),
 				&ramdata[0], ramdata_bin_len,
 				0, 0, 1,
 				&csize, &delta
@@ -1241,16 +1261,17 @@ void usage() {
 	printf("	-t <path> - color table path (default rainbow, built in), 16 byte length of atari colors\n");
 	printf("	-o <path> - output car path (filetype: .car, .bin, .exe or .xex); no ext to save all .car, .bin and .xex.\n");
 	printf("	-b <path> - input binary car image path (type .car or .bin) to make the cart flasher of\n");
-	printf("	-a <path> - input binary car image path (type .car or .bin) to analyse\n");
+	//printf("	-a <path> - input binary car image path (type .car or .bin) to analyse\n");
 	printf("	-c <compression> - forced compression method 0"
 #ifdef APULTRA
 	"/1/2"
 #endif
 	"/3/a, (default 'a'uto) like in lines, in lines have priority over this)\n");
 	printf("	-f <path> - path to 1024 byte length font file\n");
+	printf("	-F - force to include damaged/cut/prolonged executables\n");
 	printf("	-s <size> - logical cart size: 32/64/128/256/512/1024, default 1024\n");
 	printf("	-S <size> - physical cart size: 32/64/128/256/512/1024, default as logical; if set must be after -s\n");
-	printf("	-X <path> - offline block compress *.xex file to *.bzx0 for latter use (ignores all other switches)\n");
+	//printf("	-X <path> - offline block compress *.xex file to *.bzx0 for latter use (ignores all other switches)\n");
 	printf("	-v[v][v] - be verbose, level 1,2 or 3\n");
 	printf("	-? - this help\n\n");
 #ifndef __MINGW__
@@ -1326,6 +1347,9 @@ int main( int argc, char* argv[] )
 							}
 						}
 
+						break;
+					case 'F':
+						do_force=1;
 						break;
 					case 'f':
 						if (!has_val) usage();
