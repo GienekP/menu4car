@@ -42,7 +42,7 @@ typedef unsigned char U8;
 #define NAMELEN (0x100)
 #define PARAMSLEN (8)
 #define DELIM	('|')
-#define MAX_PAGES	6
+#define MAX_PAGES	7
 #define MAX_ENTRIES	(MAX_PAGES*26)
 #define MAX_ENTRIES_1	(MAX_ENTRIES+1)
 

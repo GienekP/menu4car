@@ -15,10 +15,11 @@ CYCLBUF = $800
 VARIABLES   = (BASEE+CODEBUF)
 FREEMEM	= BASEE+CODEBUF+STORAGE+1
 
-screen_data = $8300 ; defined in ramdata.asm
-fonts = $9800 ; defined in ramdata.asm
-antic = $8200
-DLI_SCREEN_ADDR = $8214
+MAXPAGES	= 7
+screen_data = $8640 ; defined in ramdata.asm
+fonts = $8000 ; defined in ramdata.asm
+antic = $8600
+DLI_SCREEN_ADDR = $8614
 
 ; entry points
 GET_FROM_CAR	= (BASEE+GETBYTE-DTACPYS)
@@ -151,13 +152,13 @@ RESETCD	= $E477
 ;-----------------------------------------------------------------------		
 ; Table of files:
 ; bank part of address
-tabbnk	:+(157) dta 0
+tabbnk	:+(MAXPAGES*26+1) dta 0
 ; in-bank adress lo byte 
-tabalo	:+(157) dta 0
+tabalo	:+(MAXPAGES*26+1) dta 0
 ; in-bank adress hi byte 
-tabahi	:+(157) dta 0
+tabahi	:+(MAXPAGES*26+1) dta 0
 ; translate table - position in menu
-tabpos	:+(157) dta 0
+tabpos	:+(MAXPAGES*26+1) dta 0
 
 STARTRAMDATA
 ; THERE IS DATA TO COPY TO RAM AREA WHEN CART IS OFF.
@@ -303,9 +304,9 @@ CopyUniY
 ; Keyboard Table
 ;		      A   B   C   D   E   F   G   H   I   J   K   L   M   N   O   P   Q   R   S   T   U   V   W   X   Y   Z
 KEYTBLE	dta	$FF,$3F,$15,$12,$3A,$2A,$38,$3D,$39,$0D,$01,$05,$00,$25,$23,$08,$0A,$2F,$28,$3E,$2D,$0B,$10,$2E,$16,$2B,$17
-		; 1 2 3 4 5 6
 kdigits
-		dta 31,30,26,24,29,27
+		;    1  2  3  4  5  6  7
+		dta 31,30,26,24,29,27,51
 keytbllen	=	*-KEYTBLE
 kdigits_num	=	*-kdigits
 
@@ -551,7 +552,7 @@ MLOOP	jsr PAINT
 RANDOPT	lda RANDOM
 		cmp CNT
 		bcs RANDOPT
-		sta POS	; random pos, 0<=CNT<6*26
+		sta POS	; random pos, 0<=CNT<MAXPAGES*26
 		bcc RESTORE ; with random  pos without key translation
 FINDKEY		dex
 		cpx #(keytbllen-kdigits_num-1)
@@ -811,9 +812,9 @@ PRLAST		ldy PAGE
 		dex
 		stx TMP
 @		rts		
-PAGES		:6 dta	#*26
+PAGES		:(MAXPAGES) dta	#*26
 		.print "#define	FILL_PAGES_OFFSET	0x",*-$a000
-FILLPAGES	:6 dta	0
+FILLPAGES	:(MAXPAGES) dta	0
 		.print "#define	NUM_PAGES_OFFSET	0x",*-$a000
 NUMPAGES	dta	0
 
@@ -828,9 +829,9 @@ setScreen
 		sta	DLI_SCREEN_ADDR+2
 		rts
 pageaddrs_lo
-		:6 dta	<(#*$340+screen_data)
+		:(MAXPAGES) dta	<(#*$340+screen_data)
 pageaddrs_hi                                                                                                                                         
-		:6 dta	>(#*$340+screen_data)
+		:(MAXPAGES) dta	>(#*$340+screen_data)
 
 
 		
