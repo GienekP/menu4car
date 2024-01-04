@@ -14,7 +14,8 @@ The example file menu4car.txt contains an input in form of sort of csv file, sep
 The first field is the name of the game in readable form. Only first 24 chars will be copied.
 The second field is the path to the DOS binary executable , or 1k, 2k, 4k, 8k .car cartridge image format.
 
-Cartridge .car images are treated as ordinary 8kB cartridges and must have headers and '.car' extension. When mounted, system sees them as original cartridge.
+Cartridge .car images are treated as ordinary 8kB cartridges and must have headers and '.car' extension. When mounted, system sees them as original cartridge (they sit in one of the bankk in JCart so they are real carts)
+
 
 In the future more file types will be handled (planned ATR files)
 
@@ -25,7 +26,7 @@ The third optional field are the options. For now options for dos executables:
 * c3 - zx0 every DOS block (long enough) compression
 * ca - auto - gets the shortest compressed version (or uncompressed) from above
 
-Maximum 4 * 26 = 104 files may be added. Sometimes some game may not work with compression (what games? - please report in Issues), please add c0 as the option then for tests (and raise an issue, if the file works on Atari for example from SIO device)
+Maximum 7 * 26 = 182 files may be added. Sometimes some game may not work with compression (what games? - please report in Issues), please add c0 as the option then for tests (and raise an issue, if the file works on Atari for example from SIO device)
 
 ## Usage
 
@@ -98,9 +99,9 @@ To init submodules, type:
     git submodule init
     git submodule update
     
-In case "by hand" the apultra content should be placed in menu4car/apultra catalog. Apultra content is optional. ZX0 is obligatory.
+In case "by hand" the apultra content should be placed in menu4car/apultra catalog. Apultra content is optional. ZX0 is obligatory, but in slightly modified version. https://github.com/jhusak/ZX0 is the right one.
 
-Then type "make" to make dependences (apultra library) and the menu4car itself.
+Then type "make" to make dependences (apultra library and ZX0) and the menu4car itself.
 
 Optionally go to the "tools" tirectory and type "make" to build homesoft atr converter tool. This tool outputs all the games and corresponding txt file with file list.
 
@@ -108,10 +109,10 @@ Optionally go to the "tools" tirectory and type "make" to build homesoft atr con
 
 The main author of main functionality: menu, xex reading - GienekP
 
-The add-ons: cmdline arguments, optimization, compression, 8kB cartridge handling, 6-page navigation, xex flasher generation - Jakub Husak
+The add-ons: cmdline arguments, optimization, compression, 8kB cartridge handling, 7-page navigation, xex flasher generation, xex compressed loading - Jakub Husak
 
 The apultra 6502 decompressor by xxl (incompatibility of apultra compressed output with aplib spec fixed by him, also); also zx0 6502 decompressor by him.
 
 The apultra compressor by Emmanuel Marty.
 
-The ZX0 compressor by Einar Saukas.
+The ZX0 compressor by Einar Saukas, modified by ClaireCheshireCat.
