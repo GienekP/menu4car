@@ -657,8 +657,6 @@ unsigned int addPos(U8 *data, U8 *ramdata, unsigned int carsize, const char *nam
 		if (be_verbose)
 			printf("type XEX... ");
 		size=repairFile(bufplain,size);
-		printf("SIZE %d\n",size);
-
 		
 		// compress file, get new size.
 		if (size) {
